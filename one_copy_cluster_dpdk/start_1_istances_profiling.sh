@@ -1,0 +1,8 @@
+#!/bin/bash
+#Starts a cluster on the number of cores passed by parameters
+
+profile="/usr/bin/perf_3.16 stat -e cycles,instructions,branches,branch-misses,cache-references,cache-misses,major-faults,cpu/mem-loads/,cpu/mem-stores/,r1a2,r5a3"
+
+$profile  ./build/cluster_dpdk -c 0X03 -n 4 --proc-type=auto -- -n 1 -p 0 &
+sleep 5
+

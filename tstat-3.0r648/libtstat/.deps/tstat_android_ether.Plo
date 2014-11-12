@@ -1,0 +1,4 @@
+tstat_android_ether.lo: ../tstat/tstat_android_ether.c \
+ /usr/include/stdc-predef.h
+
+/usr/include/stdc-predef.h:

@@ -32,9 +32,10 @@ INSTALLATION * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 USAGE: * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 To use the cluster please read about Tstat configuration on http://tstat.polito.it/HOWTO.shtml .
-By default Tstat configuration file is tstatX.conf where X in the number of the instance.
+By default Tstat configuration file is tstatX.conf in the subdirectory tstat-conf where X in the number of the instance.
 Infact each Tstat instance has got a different conf file in order to potentially keep separated logs and histograms directory.
 Default log directory is tstatX.log.out where X in the number of the instance.
+The system produces stats on its performances, and they are stored in tstat-stats subdirectory. One file for each instance.
 
 To start the cluster DPDK is recomended to use the provided scripts.
 Every script has a sintax like this:

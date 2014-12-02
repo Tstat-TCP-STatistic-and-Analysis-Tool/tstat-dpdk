@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <sys/queue.h>
 #include <sys/syscall.h>
+#include <math.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -44,7 +45,14 @@ static void sig_handler(int signo);
 static void init_port(int i);
 static int parse_args(int argc, char **argv);
 
-/* RSS symmetrical 40 Byte seed  */
+/* Struct for exchanging packets between the two threads */
+struct packet_container{
+	struct timeval time;
+	uint16_t length;
+	uint8_t data [2048-sizeof(struct timeval) - sizeof(uint16_t)];
+};
+
+/* RSS symmetrical 40 Byte seed, according to "Scalable TCP Session Monitoring with Symmetric Receive-side Scaling" (Shinae Woo, KyoungSoo Park from KAIST)  */
 uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
@@ -52,14 +60,22 @@ uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
 };
 
-/* This seed is for IP isolation
-uint8_t rss_seed [] = { 	
+/* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
+uint8_t rss_seed_src_ip [] = { 	
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}; */
+};
+/* This seed is to load balance only destination source IP, according to me (Martino Trevisan, from nowhere particular) */
+uint8_t rss_seed_dst_ip [] = { 	
+			0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
 
 
 /* Struct for devices configuration for const defines see rte_ethdev.h */
@@ -74,7 +90,7 @@ static const struct rte_eth_conf port_conf = {
 		.rss_conf = {
 			.rss_key = rss_seed,				/* Set the seed,					*/
 			.rss_key_len = 40,				/* and the seed length.					*/
-			.rss_hf = (ETH_RSS_IPV4_TCP | ETH_RSS_UDP) ,	/* Set the mask of protocols RSS will be aplied to 	*/
+			.rss_hf = (ETH_RSS_IPV4_TCP | ETH_RSS_UDP) ,	/* Set the mask of protocols RSS will be applied to 	*/
 		}	
 	}
 };

@@ -1,53 +1,50 @@
 #include "main.h"
 
 /* Constants of the system */
-#define TSTAT_CONF_FILE "tstat0.conf"
-#define TSTAT_LOG_DIR "tstat0.log"
+#define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"
+#define TSTAT_LOG_DIR "tstat00.log"
 
-#define MEMPOOL_NAME "cluster_mem_pool"				// Name of the mem_pool, useless comment....
-#define MEMPOOL_ELEM_NB (4096*4*2*2) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
+#define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
+#define MEMPOOL_ELEM_NB (4096*16) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
 #define MEMPOOL_ELEM_SZ 2048  					// Power of two greater than 1500
 #define MEMPOOL_CACHE_SZ 512  					// Must be greater or equal to CONFIG_RTE_MEMPOOL_CACHE_MAX_SIZE and "n modulo cache_size == 0". Empirically max is 512
 
-#define INTERMEDIATEPOOL_NAME "intermediate_pool"
-#define INTERMEDIATEPOOL_ELEM_NB (1048576-1)		//   The size (no more than 1048576-1 we suggest)
+#define INTERMEDIATEPOOL_NAME "intermediate_pool"	// Name of intermediate memory pool.
+#define INTERMEDIATEPOOL_ELEM_NB (1048576-1)		//   The size (check amount of RAM of your system to set up this value). Use (4*1048576)/NB_INSTANCES
 #define INTERMEDIATEPOOL_ELEM_SZ 2048			//    is 2GB.
-#define INTERMEDIATEPOOL_CACHE_SZ 512			// Max cache size
+#define INTERMEDIATEPOOL_CACHE_SZ 512			// Max cache size is 512, use this value
 
 #define INTERMEDIATERING_NAME "intermedate_ring"
 #define INTERMEDIATERING_SZ (INTERMEDIATEPOOL_ELEM_NB+1)
 
-#define RX_QUEUE_SZ 4096		// The size of rx queue. Max is 4096 and in the one you'll have best percformance with.
-#define TX_QUEUE_SZ 256		// Unused, you don't tx packets
+#define RX_QUEUE_SZ 4096		// The size of rx queue. Max is 4096 and is the one you'll have best performances with.
+#define TX_QUEUE_SZ 256			// Unused, you don't tx packets
 #define PKT_BURST_SZ 1024		// The max size of batch of packets retreived when invoking the receive function. Use the RX_QUEUE_SZ for hgh speed
 
-#define STATS_PRINT_RATE 1000000	// You print stats each STATS_PRINT_RATE packets received
-
-struct packet_container{
-	struct timeval time;
-	uint16_t length;
-	uint8_t data [2048-sizeof(struct timeval) - sizeof(uint16_t)];
-};
+#define STATS_PRINT_RATE (3700000000) 	// You print stats each STATS_PRINT_RATE clock cycles. On this machine is 3700000000, since clock is 3.7 Ghz. Use 140s for 5 min traces, 85s at 10Gbps
+#define STDEV_THRESH (3700000)		// define the threshold for calculating the stdev. Samples higher than STDEV_THRESH will be ignored. Value expressed in CPU clocks.
+#define STAT_FILE "tstat-stats/stats00.txt"		// define the file statistics are put in. Every instance has got statsX.txt file
 
 /* Global vars */
 /* System vars */
 static int nb_sys_ports;
 static int nb_sys_cores;
 static int nb_istance;
-/* Stats */
-static uint64_t nb_drop=0;
-static uint64_t nb_packets=0;
-static uint64_t nb_tstat_packets=0;
-static uint64_t max = 0;
-static uint64_t avg = 0;
-static uint64_t old_time = 0;
-static uint64_t old_nb_packets = 0;
-static uint64_t old_nb_drop = 0;
-static uint64_t old_nb_tstat_packets=0;
 /* Data structs of the system*/
 static struct rte_mempool * intermediate_pool;
 static struct rte_ring    * intermediate_ring;
 static struct rte_mempool * pktmbuf_pool;
+/* Stats */
+static uint64_t nb_drop=0;
+static uint64_t nb_packets=0;
+static uint64_t nb_tstat_packets=0;
+static double max = 0;
+static uint64_t avg = 0;
+static double avg_quad = 0;
+static uint64_t old_time = 0;
+static uint64_t old_nb_packets = 0;
+static uint64_t old_nb_drop = 0;
+static uint64_t old_nb_tstat_packets=0;
 
 /* Main function */
 int main(int argc, char **argv)
@@ -59,21 +56,18 @@ int main(int argc, char **argv)
 	char * in = strdup(TSTAT_LOG_DIR);
 	struct timeval tv;
 
-	//struct sched_param sc_par;
-	/* Give to current thread max priority for CPU and I/O (in case the consumer launches other threads). It is used REAL_TIME IO sched policy */
-	//sc_par.sched_priority = 0;
-	//ret = pthread_setschedparam(pthread_self(), SCHED_OTHER, &sc_par);
-	//if (ret != 0) FATAL_ERROR("Impossible set CPU scheduling policy\n");
-        //syscall(SYS_ioprio_set,1, 0, (2 << 13)| 5 );
-
 	/* Create handler for SIGINT for CTRL + C closing */
 	signal(SIGINT, sig_handler);
 
-	/* Initialize DPDK enviroment */
+	/* Initialize DPDK enviroment with args, then shift argc and argv to get application parameters */
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0) FATAL_ERROR("Cannot init EAL\n");
 	argc -= ret;
 	argv += ret;
+
+	/* Check if this application can use two cores*/
+	ret = rte_lcore_count ();
+	if (ret != 2) FATAL_ERROR("This application needs exactly two (2) cores.");
 
 	/* Parse arguments (must retrieve the total number of cores, which core I am, and time engine to use) */
 	parse_args(argc, argv);
@@ -88,27 +82,29 @@ int main(int argc, char **argv)
 	if (nb_sys_ports <= 0) FATAL_ERROR("Cannot find ETH devices\n");
 
 	/* Init libtstat, with per-instance log directory and conf files */
-	libtstat_conf_file[5] += nb_istance;
+	libtstat_conf_file[16] += nb_istance/10;
+	libtstat_conf_file[17] += nb_istance%10;
 	tstat_init(libtstat_conf_file);
 	gettimeofday(&tv, NULL);
-	in[5] += nb_istance;
+	in[5] += nb_istance/10;
+	in[6] += nb_istance%10;
 	tstat_new_logdir(in, &tv);
 
-	/* Init intermediate queue data structures: the mem_pool */
+	/* Init intermediate queue data structures: the mem_pool. Give each MEM_POOL of different instances a different name */
 	strcpy(name, INTERMEDIATEPOOL_NAME);
 	sprintf(nb_str, "%d", nb_istance);
 	strcat(name, nb_str);
 	intermediate_pool = rte_mempool_create( name, INTERMEDIATEPOOL_ELEM_NB, INTERMEDIATEPOOL_ELEM_SZ, INTERMEDIATEPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), NULL, NULL, NULL, NULL,rte_socket_id(), MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
 	if (intermediate_pool == NULL) FATAL_ERROR("Cannot create intermediate_pool. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_TAILQ: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", rte_errno, ENOMEM, ENOSPC, E_RTE_NO_TAILQ, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
 	
-	/* Init intermediate queue data structures: the ring */
+	/* Init intermediate queue data structures: the ring. Give each RING of different instances a different name */
 	strcpy(name, INTERMEDIATERING_NAME);
 	sprintf(nb_str, "%d", nb_istance);
 	strcat(name, nb_str);
 	intermediate_ring = rte_ring_create 	(name, INTERMEDIATERING_SZ, rte_socket_id(), RING_F_SP_ENQ | RING_F_SC_DEQ );
  	if (intermediate_ring == NULL ) FATAL_ERROR("Cannot create ring");
 
-	/* The master process initializes the ports and the memory pool */
+	/* The master process initializes the ports and the memory pool for the NICs */
 	if (rte_eal_process_type() == RTE_PROC_PRIMARY){
 	
 		/* Create a mempool with per-core cache, initializing every element for be used as mbuf, and allocating on the current NUMA node */
@@ -125,10 +121,11 @@ int main(int argc, char **argv)
 		if (pktmbuf_pool == NULL) FATAL_ERROR("Cannot create mem_pool\n");
 	}
 
-	/* Start consumer and producer routine on 2 different cores */
+	/* Start consumer and producer routine on 2 different cores: consumer launched first... */
 	ret =  rte_eal_mp_remote_launch (main_loop_consumer, NULL, SKIP_MASTER);
 	if (ret != 0) FATAL_ERROR("Cannot start consumer thread\n");	
 	
+	/* ... and then producer on this core */
 	main_loop_producer ( NULL );	
 
 	return 0;
@@ -144,7 +141,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 	uint64_t diff_usec;
 	void *pip;
 
-	/* Init time val*/
+	/* Init time variables*/
 	ret = gettimeofday(&t_pack , NULL);
 	if (ret != 0) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
 	ret = gettimeofday(&t_new, NULL);
@@ -156,17 +153,16 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 		/* Read a burst for current port at queue 'nb_istance'*/
 		nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, PKT_BURST_SZ);
 
-		/* Create the batch times*/
+		/* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
 		t_pack = t_new;
 		ret = gettimeofday(&t_new, NULL);
-		if (ret != 0) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+		if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
 		diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
-		if (  nb_rx != 0) diff_usec /= nb_rx;
+		if (  unlikely( nb_rx != 0) ) diff_usec /= nb_rx;
 		
-		
-		/* For each received packet. The for condition uses the expression 'likely' helps compiler in branch prediction */
-		for (i = 0; i < nb_rx; i++) {
-			/* Retreive packet from burst, increase the counter in thread safe way */
+		/* For each received packet. */
+		for (i = 0; likely( i < nb_rx ) ; i++) {
+			/* Retreive packet from burst, increase the counter */
 			m = pkts_burst[i];
 			nb_packets++;
 
@@ -183,8 +179,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 			/* Creating buffer to enqueue and handling full buffer condition*/
 			ret = rte_mempool_get(intermediate_pool, (void**)(&to_enqueue) );
 
-			if ( ret != 0 ){
-
+			if ( unlikely(ret != 0 )){
 				/* I case of full buffer, print error message (every 1048576 packets lost) ad free NICs buffers anyway*/
 				nb_drop++;
 				rte_pktmbuf_free((struct rte_mbuf *)m);
@@ -198,17 +193,16 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 
 			/* Enqueieing buffer */
 			ret = rte_ring_enqueue (intermediate_ring, to_enqueue);
-			if(ret != 0 ) FATAL_ERROR("Lost coordination beetween data structures\n");
+			if( unlikely(ret != 0 )) FATAL_ERROR("Lost coordination beetween data structures\n");
 
 			/* Releasing the NIC's mbuf */
 			rte_pktmbuf_free((struct rte_mbuf *)m);
 		}
 
-		/* Increasing reading port number in Round-Robin logic*/
+		/* Increasing reading port number in Round-Robin logic */
 		read_from_port = (read_from_port + 1) % nb_sys_ports;
 
 	}
-
 
 	return 0;
 }
@@ -216,8 +210,17 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 	int ret;
-	uint64_t time, freq, local_nb_packets, local_nb_drop;
+	uint64_t time, interval, end_time,freq, local_nb_packets, local_nb_drop;
+	double std_dev, average;
 	struct packet_container * pkt;
+	char * file_name;
+	FILE * debug_file;
+
+	/* Open debug file */
+	file_name = strdup (STAT_FILE);
+	file_name[17] += nb_istance/10;
+	file_name[18] += nb_istance%10;	
+	debug_file = fopen(file_name, "w");
 
 	/* Infinite loop for consumer thread */
 	for(;;){
@@ -231,36 +234,51 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		/* Pass to tstat and take time before and after */
 		time = rte_get_tsc_cycles();
 		tstat_next_pckt(&(pkt->time), (void* )pkt->data, (void* ) (pkt->data+pkt->length), pkt->length, 0);
-		time = rte_get_tsc_cycles() - time;
+		end_time = rte_get_tsc_cycles();
+		interval = end_time - time;
 
 		/* Update stats */
-		if(time > max) max = time;
-		avg = avg + time;
+		if(interval > max) max = interval;
+		avg = avg + interval;
+		/* Do not count values greater than 1 ms */
+		if (interval < STDEV_THRESH) avg_quad = avg_quad + (double)interval*interval;
 		nb_tstat_packets++;
 
 		/* Print stats */
-		local_nb_packets = nb_packets;
-		if ( local_nb_packets % STATS_PRINT_RATE == 0){
-			/* Read time, freq and drop packets */
+		if ( end_time - old_time > STATS_PRINT_RATE ){
+			/* Read time, freq and packets (copy them to avoid concurrency problems)*/
 			time = rte_get_tsc_cycles();
 			freq = rte_get_tsc_hz();
+			local_nb_packets = nb_packets;
 			local_nb_drop = nb_drop;
+
+			/* Calculate avg, max and stdev */
+			average = (double)avg/(nb_tstat_packets-old_nb_tstat_packets)*1000000/freq; /* calculated in us */
+			std_dev = sqrt (avg_quad*1000000/freq*1000000/freq/(nb_tstat_packets-old_nb_tstat_packets) - average*average); /* calculated in us */
+			max = max*1000000/freq; /* convert in us */
+
+			/* Print on file avg, max, and std_dev*/
+			fprintf(debug_file, "%10.5f %10.5f %10.5f\n", average,max,std_dev);
 
 			/* Print stats */
 			printf("Instance: %d ", nb_istance);
-			printf("Avg: %5.3fus Max: %11.3fus ", (double)avg/(nb_tstat_packets-old_nb_tstat_packets)*1000000/freq, (double)max/freq*1000000 );
+			printf("Avg: %5.3fus Max: %11.3fus StdDev: %8.3f ", average, max, std_dev );
+			printf("TCP cl.: %5ld UDP cl.: %5ld ", tcp_cleaned, udp_cleaned);
 			printf("Rate: %5.3fMpps, Loss: %5.3fMpps ", (double)(local_nb_packets - old_nb_packets)/(time-old_time)*freq/1000000, (double)(local_nb_drop - old_nb_drop)/(time-old_time)*freq/1000000 );
 			printf("Buffer occupation: %3.0f%%", (float)rte_mempool_free_count(intermediate_pool)/INTERMEDIATEPOOL_ELEM_NB*100);			
 			if (local_nb_drop - old_nb_drop > 0) printf (" <---------------------------");		
-			printf ("\n");	
-
+			printf ("\n");
+			
 			/* Overwrite variables, and reset counters */
 			old_time = time;
 			old_nb_packets = local_nb_packets;
 			old_nb_drop = local_nb_drop;
 			old_nb_tstat_packets = nb_tstat_packets;
 			avg = 0;
+			avg_quad = 0;
 			max = 0;
+			tcp_cleaned = 0;
+			udp_cleaned = 0;
 		}
 
 		/* Release buffer where the processed packet was stored */
@@ -284,13 +302,12 @@ static void sig_handler(int signo)
 		int i, j;
 		struct rte_eth_stats stat;
 
-		/* The master core print per port stats */
+		/* The master core print per port and per queue stats */
 		if (rte_eal_process_type() == RTE_PROC_PRIMARY){
 			for (i = 0; i < nb_sys_ports; i++){	
 				rte_eth_stats_get(i, &stat);
 				printf("\nPORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
 				for (j = 0; j < nb_sys_cores; j++){
-
 					/* Per port queue stats */
 					printf("\n\tQueue %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", j, stat.q_ipackets[j] ,stat.q_errors[j], stat.q_ipackets[j]+stat.q_errors[j], (float)stat.q_errors[j]/(stat.q_ipackets[j]+stat.q_errors[j])*100);
 				}			
@@ -374,12 +391,12 @@ static void init_port(int i) {
 
 		/* Sperimental, try unbalanced queue distribution for RSS in order to mitigate asymmetrical speed of instance due to hypethreading */
 		if (nb_sys_cores == 3){
-			/* Create Redirection Table of RSS; weight are  34 60 34 */
+			/* Create Redirection Table of RSS; weight are  35 58 35 */
 			reta_3_cores.mask_lo = 0xFFFFFFFFFFFFFFFF;
 			reta_3_cores.mask_hi = 0xFFFFFFFFFFFFFFFF;
-			for (j=0; j < 34 ; j++)reta_3_cores.reta [j] = 0;
-			for (j=34; j < 34+60; j++)reta_3_cores.reta [j] = 1;
-			for (j=34+60; j < 128; j++)reta_3_cores.reta [j] = 2;
+			for (j=0; j < 35 ; j++)reta_3_cores.reta [j] = 0;	//34
+			for (j=35; j < 35+58; j++)reta_3_cores.reta [j] = 1;	// 34 34 60
+			for (j=35+58; j < 128; j++)reta_3_cores.reta [j] = 2;	//34 60 128
 			/* Updating table on port 'i' */
 			rte_eth_dev_rss_reta_update(i, &reta_3_cores);
 		}

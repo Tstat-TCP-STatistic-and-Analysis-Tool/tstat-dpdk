@@ -1,0 +1,2 @@
+#C#c_ip:1	c_port:2	s_ip:3	s_port:4	time_abs:5	method:6	hostname:7	path:8	referer:9	user_agent:10
+#S#c_ip:1	c_port:2	s_ip:3	s_port:4	time_abs:5	HTTP:6	response:7	content_len:8	content_type:9	server:10	range:11	location:12

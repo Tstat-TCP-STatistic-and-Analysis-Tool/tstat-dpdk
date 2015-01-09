@@ -16,10 +16,9 @@ INSTALLATION * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	- tools/dpdk_nic_bind.py --bind=igb_uio eth0 ...
 4) Set CPU on performance
 	cpufreq-set -r -g performance
-5) Install Tstat (libtstat is needed):
-	- Download from http://tstat.polito.it/viewvc/software/tstat/branches/tstat-dpdk/tstat-3.0r648/. SVN is available.
-	- tar -xzvf tstat-2.x.y.tar.gz
-	- cd tstat-2.x.y
+5) Install Tstat (libtstat in this specifical version is needed):
+	- Download from "http://tstat.polito.it/viewvc/software/tstat/branches/tstat-dpdk/tstat-3.0r648/". SVN is available.
+	- Go in the directory where you downloaded Tstat
 	- ./autogen.sh
 	- ./configure --enable-libtstat
 	- make
@@ -32,15 +31,16 @@ INSTALLATION * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 USAGE: * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 To use the cluster please read about Tstat configuration on http://tstat.polito.it/HOWTO.shtml .
-By default Tstat configuration file is tstatX.conf in the subdirectory tstat-conf where X in the number of the instance.
+By default Tstat configuration file is tstatX.conf/ in the subdirectory tstat-conf where X in the number of the instance.
 Infact each Tstat instance has got a different conf file in order to potentially keep separated logs and histograms directory.
 Default log directory is tstatX.log.out where X in the number of the instance.
-The system produces stats on its performances, and they are stored in tstat-stats subdirectory. One file for each instance.
+The system produces stats on its performances, and they are stored in tstat-stats/ subdirectory. One file for each instance.
 
-To start the cluster DPDK is recomended to use the provided scripts.
+To start the cluster DPDK is recomended to use the provided scripts in the scripts/ directory.
 Every script has a sintax like this:
 start_X_instances.sh
 Where 'X' is the number of instances to be started.
+Just ignore the scripts which doesn't respect this name format.
 Note that every instance uses two logical cores, so pay attention to have enough cores.
 
 By default cluster_dpdk uses all interfaces bound to DPDK. To modify this behavior pass --use-device or -b option to DPDK EAL.

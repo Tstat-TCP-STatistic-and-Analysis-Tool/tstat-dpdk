@@ -14,7 +14,7 @@ LDLIBS = -ltstat -lpcap -lpthread -lm
 APP = cluster_dpdk
 
 # all source are stored in SRCS-y
-SRCS-y := main.c
+SRCS-y := src/main_copy.c
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)

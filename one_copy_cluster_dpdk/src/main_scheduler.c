@@ -1,0 +1,484 @@
+#define _GNU_SOURCE
+#include <sched.h>
+#include "main.h"
+#include <pthread.h>
+
+#include <unistd.h>
+
+/* Constants of the system */
+#define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"
+#define TSTAT_LOG_DIR "tstat00.log"
+
+/* Scheduling parameters: period time and activity time */
+#define SCHED_RUNTIME_NS 500000
+#define SCHED_TOTALTIME_NS 2000000
+
+#define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
+#define MEMPOOL_ELEM_NB (8388608/2-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
+#define MEMPOOL_ELEM_SZ 2048  					// Power of two greater than 1500
+#define MEMPOOL_CACHE_SZ 512  					// Must be greater or equal to CONFIG_RTE_MEMPOOL_CACHE_MAX_SIZE and "n modulo cache_size == 0". Empirically max is 512
+
+#define PRODUCER_SLEEP_TIME 1000				// How long the producer sleeps when it finds empty queue (in microsec).
+
+#define INTERMEDIATERING_NAME "intermedate_ring"
+#define INTERMEDIATERING_SZ (1048576)
+
+#define RX_QUEUE_SZ 4096		// The size of rx queue. Max is 4096 and is the one you'll have best performances with.
+#define TX_QUEUE_SZ 256			// Unused, you don't tx packets
+#define PKT_BURST_SZ 1024		// The max size of batch of packets retreived when invoking the receive function. Use the RX_QUEUE_SZ for hgh speed
+
+#define STATS_PRINT_RATE (3500000000) 	// You print stats each STATS_PRINT_RATE clock cycles. On this machine is 3700000000, since clock is 3.7 Ghz. Use 140s for 5 min traces, 85s at 10Gbps
+#define STDEV_THRESH (3500000)		// define the threshold for calculating the stdev. Samples higher than STDEV_THRESH will be ignored. Value expressed in CPU clocks.
+#define STAT_FILE "tstat-stats/stats00.txt"		// define the file statistics are put in. Every instance has got statsX.txt file
+
+/* Deadline scheduling structure */
+struct sched_attr {
+	uint32_t size;              /* Size of this structure */
+	uint32_t sched_policy;      /* Policy (SCHED_*) */
+	uint64_t sched_flags;       /* Flags */
+	int32_t sched_nice;        /* Nice value (SCHED_OTHER,SCHED_BATCH) */
+	uint32_t sched_priority;    /* Static priority (SCHED_FIFO, SCHED_RR) */
+	/* Remaining fields are for SCHED_DEADLINE */
+	uint64_t sched_runtime;
+	uint64_t sched_deadline;
+	uint64_t sched_period;
+};
+
+#ifdef __x86_64__
+#define __NR_sched_setattr 314
+#define __NR_sched_getattr 315
+#endif
+
+#ifdef __i386__
+#define __NR_sched_setattr 351
+#define __NR_sched_getattr 352
+#endif
+
+#ifdef __arm__
+#define __NR_sched_setattr 380
+#define __NR_sched_getattr 381
+#endif
+
+#ifndef SCHED_DEADLINE
+#define SCHED_DEADLINE 6
+#endif
+
+#ifndef SCHED_FLAG_RESET_ON_FORK
+#define SCHED_FLAG_RESET_ON_FORK 0x01
+#endif 
+
+/* Global vars */
+/* System vars */
+static int nb_sys_ports;
+static int nb_sys_cores;
+static int nb_istance;
+/* Data structs of the system*/
+static struct rte_ring    * intermediate_ring;
+static struct rte_mempool * pktmbuf_pool;
+/* Stats */
+static uint64_t nb_drop=0;
+static uint64_t nb_packets=0;
+static uint64_t nb_tstat_packets=0;
+static double max = 0;
+static uint64_t avg = 0;
+static double avg_quad = 0;
+static uint64_t old_time = 0;
+static uint64_t old_nb_packets = 0;
+static uint64_t old_nb_drop = 0;
+static uint64_t old_nb_tstat_packets=0;
+
+/* Main function */
+int main(int argc, char **argv)
+{
+	int ret;
+	int i;
+	char name [50], nb_str [10];
+	char * libtstat_conf_file = strdup(TSTAT_CONF_FILE);
+	char * in = strdup(TSTAT_LOG_DIR);
+	pthread_t producer_t;
+	struct timeval tv;
+
+	/* Create handler for SIGINT for CTRL + C closing */
+	signal(SIGINT, sig_handler);
+
+	/* Initialize DPDK enviroment with args, then shift argc and argv to get application parameters */
+	ret = rte_eal_init(argc, argv);
+	if (ret < 0) FATAL_ERROR("Cannot init EAL\n");
+	argc -= ret;
+	argv += ret;
+
+	/* Check if this application can use two cores*/
+	ret = rte_lcore_count ();
+	if (ret != 1) FATAL_ERROR("This application needs exactly two (1) cores.");
+
+	/* Parse arguments (must retrieve the total number of cores, which core I am, and time engine to use) */
+	parse_args(argc, argv);
+	if (ret < 0) FATAL_ERROR("Wrong arguments\n");
+
+	/* Probe PCI bus for ethernet devices */
+	ret = rte_eal_pci_probe();
+	if (ret < 0) FATAL_ERROR("Cannot probe PCI\n");
+
+	/* Get number of ethernet devices */
+	nb_sys_ports = rte_eth_dev_count();
+	if (nb_sys_ports <= 0) FATAL_ERROR("Cannot find ETH devices\n");
+
+	/* Init libtstat, with per-instance log directory and conf files */
+	libtstat_conf_file[16] += nb_istance/10;
+	libtstat_conf_file[17] += nb_istance%10;
+	tstat_init(libtstat_conf_file);
+	gettimeofday(&tv, NULL);
+	in[5] += nb_istance/10;
+	in[6] += nb_istance%10;
+	tstat_new_logdir(in, &tv);
+	
+	/* Init intermediate queue data structures: the ring. Give each RING of different instances a different name */
+	strcpy(name, INTERMEDIATERING_NAME);
+	sprintf(nb_str, "%d", nb_istance);
+	strcat(name, nb_str);
+	intermediate_ring = rte_ring_create 	(name, INTERMEDIATERING_SZ, rte_socket_id(), RING_F_SP_ENQ | RING_F_SC_DEQ );
+ 	if (intermediate_ring == NULL ) FATAL_ERROR("Cannot create ring");
+
+	/* The master process initializes the ports and the memory pool for the NICs */
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY){
+	
+		/* Create a mempool with per-core cache, initializing every element for be used as mbuf, and allocating on the current NUMA node */
+		pktmbuf_pool = rte_mempool_create(MEMPOOL_NAME, MEMPOOL_ELEM_NB, MEMPOOL_ELEM_SZ, MEMPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,rte_socket_id(), 0);
+		if (pktmbuf_pool == NULL) FATAL_ERROR("Cannot create intermediate_pool. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_TAILQ: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", rte_errno, ENOMEM, ENOSPC, E_RTE_NO_TAILQ, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
+	
+		/* Operations needed for each ethernet device */			
+		for(i=0; i < nb_sys_ports; i++)
+			init_port(i);
+	}
+	/* The slave process just opens the memory pool */
+	else{
+		pktmbuf_pool = rte_mempool_lookup(MEMPOOL_NAME);
+		if (pktmbuf_pool == NULL) FATAL_ERROR("Cannot create mem_pool\n");
+	}
+
+	/* Start producer thread (on the same core) */
+	ret = pthread_create(&producer_t, NULL, (void *(*)(void *))main_loop_producer, NULL);
+	if (ret != 0) FATAL_ERROR("Cannot start producer thread\n");	
+	
+	/* ... and then loop in consumer */
+	main_loop_consumer ( NULL );	
+
+	return 0;
+}
+
+/* Loop function, batch timing implemented */
+static int main_loop_producer(__attribute__((unused)) void * arg){
+	struct rte_mbuf * pkts_burst[PKT_BURST_SZ];
+	struct timeval t_new, t_pack;
+	struct rte_mbuf * m;
+	int i, nb_rx, read_from_port = 0, ret = 0;
+	uint64_t diff_usec;
+	struct sched_attr sc_attr;
+
+	uint64_t mask;
+	mask = 0xFFFFFFFFFFFFFFFF;
+
+	ret = sched_setaffinity(0, sizeof(mask), (cpu_set_t*)&mask);
+	if (ret != 0) FATAL_ERROR("Error: cannot set affinity. Quitting...\n");
+
+	sc_attr.size = sizeof(struct sched_attr);
+	sc_attr.sched_policy = SCHED_DEADLINE;
+	sc_attr.sched_runtime =  SCHED_RUNTIME_NS;
+	sc_attr.sched_deadline = SCHED_TOTALTIME_NS ;
+	sc_attr.sched_period = SCHED_TOTALTIME_NS;
+	ret = syscall(__NR_sched_setattr,0, &sc_attr, 0);
+	if (ret != 0) FATAL_ERROR("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
+
+
+	/* Init time variables*/
+	ret = gettimeofday(&t_pack , NULL);
+	if (ret != 0) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+	ret = gettimeofday(&t_new, NULL);
+	if (ret != 0) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+
+	/* Infinite loop */
+	for (;;) {
+
+		/* Read a burst for current port at queue 'nb_istance'*/
+		nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, PKT_BURST_SZ);
+
+		/* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
+		t_pack = t_new;
+		ret = gettimeofday(&t_new, NULL);
+		if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+		diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
+		if ( likely( nb_rx != 0) ) diff_usec /= nb_rx;
+
+		/* If the NIC's queue is empty go sleeping. This feature helps in HyperThreading scenarios*/
+		if ( unlikely ( nb_rx == 0) ) usleep (PRODUCER_SLEEP_TIME);
+		
+		/* For each received packet. */
+		for (i = 0; likely( i < nb_rx ) ; i++) {
+			/* Retreive packet from burst, increase the counter */
+			m = pkts_burst[i];
+			nb_packets++;
+
+			/* Adding to t_pack the diff_time */
+			t_pack.tv_usec += diff_usec;
+			if (unlikely ( t_pack.tv_usec > 1000000 )){
+				t_pack.tv_sec  += t_pack.tv_usec / 1000000;
+				t_pack.tv_usec %= 1000000;
+			}
+
+			/* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
+			m->pkt.hash.rss = t_pack.tv_sec;
+			m->pkt.vlan_macip.data =  t_pack.tv_usec;
+
+			/*Enqueieing buffer */
+			ret = rte_ring_enqueue (intermediate_ring, m);
+
+			/* If the ring is full, free the buffer */
+			if( unlikely(ret != 0 )) {
+				nb_drop++;
+				rte_pktmbuf_free((struct rte_mbuf *)m);
+			}
+
+		}
+
+		/* Increasing reading port number in Round-Robin logic */
+		read_from_port = (read_from_port + 1) % nb_sys_ports;
+		/* If all the ports have been polled, make the thread sleep */
+		if (read_from_port == 0)
+			sched_yield();
+
+	}
+
+	return 0;
+}
+
+static int main_loop_consumer(__attribute__((unused)) void * arg){
+
+	int ret;
+	uint64_t time, interval, end_time,freq, local_nb_packets, local_nb_drop;
+	double std_dev, average;
+	char * file_name;
+	FILE * debug_file;
+	struct rte_mbuf * m;
+	struct timeval tv;
+
+	/* Open debug file */
+	file_name = strdup (STAT_FILE);
+	file_name[17] += nb_istance/10;
+	file_name[18] += nb_istance%10;	
+	debug_file = fopen(file_name, "w");
+
+	/* Infinite loop for consumer thread */
+	for(;;){
+
+		/* Dequeue packet */
+		ret = rte_ring_dequeue(intermediate_ring, (void**)&m);
+		
+		/* Continue polling if no packet available */
+		if( unlikely (ret != 0)) continue;
+
+		/* Read timestamp of the packet */
+		tv.tv_usec = m->pkt.vlan_macip.data;
+		tv.tv_sec = m->pkt.hash.rss;
+
+		/* Pass to tstat and take time before and after */
+		time = rte_get_tsc_cycles();
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), 0);
+		end_time = rte_get_tsc_cycles();
+		interval = end_time - time;
+
+		/* Update stats */
+		if(interval > max) max = interval;
+		avg = avg + interval;
+		/* Do not count values greater than 1 ms */
+		if (interval < STDEV_THRESH) avg_quad = avg_quad + (double)interval*interval;
+		nb_tstat_packets++;
+
+		/* Print stats */
+		if ( end_time - old_time > STATS_PRINT_RATE ){
+			/* Read time, freq and packets (copy them to avoid concurrency problems)*/
+			time = rte_get_tsc_cycles();
+			freq = rte_get_tsc_hz();
+			local_nb_packets = nb_packets;
+			local_nb_drop = nb_drop;
+
+			/* Calculate avg, max and stdev */
+			average = (double)avg/(nb_tstat_packets-old_nb_tstat_packets)*1000000/freq; /* calculated in us */
+			std_dev = sqrt (avg_quad*1000000/freq*1000000/freq/(nb_tstat_packets-old_nb_tstat_packets) - average*average); /* calculated in us */
+			max = max*1000000/freq; /* convert in us */
+
+			/* Print on file avg, max, and std_dev*/
+			fprintf(debug_file, "%10.5f %10.5f %10.5f\n", average,max,std_dev);
+
+			/* Print stats */
+			printf("Instance: %d ", nb_istance);
+			printf("Avg: %5.3fus Max: %11.3fus StdDev: %8.3f ", average, max, std_dev );
+			printf("TCP cl.: %5ld UDP cl.: %5ld ", tcp_cleaned, udp_cleaned);
+			printf("Rate: %5.3fMpps, Loss: %5.3fMpps ", (double)(local_nb_packets - old_nb_packets)/(time-old_time)*freq/1000000, (double)(local_nb_drop - old_nb_drop)/(time-old_time)*freq/1000000 );
+			printf("Ring occupation: %3.0f%%", 100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100);			
+			if (local_nb_drop - old_nb_drop > 0) printf (" <---------------------------");		
+			printf ("\n");
+			
+			/* Overwrite variables, and reset counters */
+			old_time = time;
+			old_nb_packets = local_nb_packets;
+			old_nb_drop = local_nb_drop;
+			old_nb_tstat_packets = nb_tstat_packets;
+			avg = 0;
+			avg_quad = 0;
+			max = 0;
+			tcp_cleaned = 0;
+			udp_cleaned = 0;
+		}
+
+		/* Release buffer where the processed packet was stored */
+		rte_pktmbuf_free((struct rte_mbuf *)m);
+
+	}
+
+	return 0;
+}
+
+/* Signal handling function */
+static void sig_handler(int signo)
+{
+	/* Catch just SIGINT */
+	if (signo == SIGINT){
+		
+		/* Waiting time proportional to istance for correct output writing*/
+		sleep(nb_istance+1);
+
+		/* The master core prints the per port stats  */
+		int i, j;
+		struct rte_eth_stats stat;
+
+		/* The master core print per port and per queue stats */
+		if (rte_eal_process_type() == RTE_PROC_PRIMARY){
+			for (i = 0; i < nb_sys_ports; i++){	
+				rte_eth_stats_get(i, &stat);
+				printf("\nPORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
+				for (j = 0; j < nb_sys_cores; j++){
+					/* Per port queue stats */
+					printf("\n\tQueue %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", j, stat.q_ipackets[j] ,stat.q_errors[j], stat.q_ipackets[j]+stat.q_errors[j], (float)stat.q_errors[j]/(stat.q_ipackets[j]+stat.q_errors[j])*100);
+				}			
+				
+			}
+			printf("\n");
+		}
+		
+		/* Every process prints per instance stats and tstat stats */
+		tstat_report report;
+    		tstat_close(&report);
+		printf("\nISTANCE: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%\n", nb_istance, nb_tstat_packets, nb_drop,  nb_tstat_packets + nb_drop, (float)nb_drop/(nb_drop+nb_tstat_packets)*100);
+		printf("TSTAT STATISTICS:\n");
+		/* Can use instead  tstat_print_report(&report, stdout); */
+		printf("Total packets: %lu\nTCP flows: %lu\nUDP flows: %lu\nTime elapsed: %.3lfs\n", report.pnum, report.f_TCP_count, report.f_UDP_count, report.wallclock / 1000000 );
+
+		exit(0);	
+	}
+}
+
+/* Init each port with the configuration contained in the structs. Every interface has nb_sys_cores queues */
+static void init_port(int i) {
+
+		int j;
+		int ret;
+		uint8_t rss_key [40];
+		struct rte_eth_link link;
+		struct rte_eth_dev_info dev_info;
+		struct rte_eth_rss_conf rss_conf;
+		struct rte_eth_fdir fdir_conf;
+		struct rte_eth_rss_reta reta_3_cores;
+
+		/* Retreiving and printing device infos */
+		rte_eth_dev_info_get(i, &dev_info);
+		printf("Name:%s\n\tDriver name: %s\n\tMax rx queues: %d\n\tMax tx queues: %d\n", dev_info.pci_dev->driver->name,dev_info.driver_name, dev_info.max_rx_queues, dev_info.max_tx_queues);
+		printf("\tPCI Adress: %04d:%02d:%02x:%01d\n", dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+		if (dev_info.max_rx_queues < nb_sys_cores) FATAL_ERROR("Every interface must have a queue on each core, but this is not supported. Quitting...\n");
+
+		/* Configure device with 'nb_sys_cores' rx queues and 1 tx queue */
+		ret = rte_eth_dev_configure(i, nb_sys_cores, 1, &port_conf);
+		if (ret < 0) rte_panic("Error configuring the port\n");
+
+		/* For each RX queue in each NIC */
+		for (j = 0; j < nb_sys_cores; j++){
+			/* Configure rx queue j of current device on current NUMA socket. It takes elements from the mempool */
+			ret = rte_eth_rx_queue_setup(i, j, RX_QUEUE_SZ, rte_socket_id(), &rx_conf, pktmbuf_pool);
+			if (ret < 0) FATAL_ERROR("Error configuring receiving queue\n");
+			/* Configure mapping [queue] -> [element in stats array] */
+			ret = rte_eth_dev_set_rx_queue_stats_mapping 	(i, j, j );
+			if (ret < 0) FATAL_ERROR("Error configuring receiving queue stats\n");
+ 	
+		}
+
+
+
+
+		/* Configure tx queue of current device on current NUMA socket. Mandatory configuration even if you want only rx packet */
+		ret = rte_eth_tx_queue_setup(i, 0, TX_QUEUE_SZ, rte_socket_id(), &tx_conf);
+		if (ret < 0) FATAL_ERROR("Error configuring transmitting queue. Errno: %d (%d bad arg, %d no mem)\n", -ret, EINVAL ,ENOMEM);
+
+		/* Start device */		
+		ret = rte_eth_dev_start(i);
+		if (ret < 0) FATAL_ERROR("Cannot start port\n");
+
+		/* Enable receipt in promiscuous mode for an Ethernet device */
+		rte_eth_promiscuous_enable(i);
+
+		/* Print link status */
+		rte_eth_link_get_nowait(i, &link);
+		if (link.link_status) 	printf("\tPort %d Link Up - speed %u Mbps - %s\n", (uint8_t)i, (unsigned)link.link_speed,(link.link_duplex == ETH_LINK_FULL_DUPLEX) ?("full-duplex") : ("half-duplex\n"));
+		else			printf("\tPort %d Link Down\n",(uint8_t)i);
+
+		/* Print RSS support, not reliable because a NIC could support rss configuration just in rte_eth_dev_configure whithout supporting rte_eth_dev_rss_hash_conf_get*/
+		rss_conf.rss_key = rss_key;
+		ret = rte_eth_dev_rss_hash_conf_get (i,&rss_conf);
+		if (ret == 0) printf("\tDevice supports RSS\n"); else printf("\tDevice DOES NOT support RSS\n");
+		
+		/* Print Flow director support */
+		ret = rte_eth_dev_fdir_get_infos (i, &fdir_conf);
+		if (ret == 0) printf("\tDevice supports Flow Director\n"); else printf("\tDevice DOES NOT support Flow Director\n"); 
+
+		/* Sperimental, try unbalanced queue distribution for RSS in order to mitigate asymmetrical speed of instance due to hypethreading */
+		if (nb_sys_cores == 3){
+			/* Create Redirection Table of RSS; weight are  35 58 35 */
+			reta_3_cores.mask_lo = 0xFFFFFFFFFFFFFFFF;
+			reta_3_cores.mask_hi = 0xFFFFFFFFFFFFFFFF;
+			for (j=0; j < 35 ; j++)reta_3_cores.reta [j] = 0;	//34
+			for (j=35; j < 35+58; j++)reta_3_cores.reta [j] = 1;	// 34 34 60
+			for (j=35+58; j < 128; j++)reta_3_cores.reta [j] = 2;	//34 60 128
+			/* Updating table on port 'i' */
+			rte_eth_dev_rss_reta_update(i, &reta_3_cores);
+		}
+
+
+}
+
+static int parse_args(int argc, char **argv)
+{
+	int option;
+	
+	/* Initialize variables to detect missing arguments */
+	nb_sys_cores = -1;
+	nb_istance = -1;
+
+	/* Retrive arguments */
+	while ((option = getopt(argc, argv,"n:p:")) != -1) {
+        	switch (option) {
+             		case 'n' : nb_sys_cores = atoi(optarg); 
+                 		break;
+             		case 'p' : nb_istance = atoi(optarg);
+                 		break;
+             		default: return -1; 
+		}
+   	}
+
+	/* Returning bad value in case of wrong arguments */
+	if(nb_sys_cores < 1 || nb_istance < 0)
+		return -1;
+
+	return 0;
+
+}
+
+
+

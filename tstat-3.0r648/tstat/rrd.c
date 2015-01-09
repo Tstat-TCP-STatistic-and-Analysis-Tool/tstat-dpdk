@@ -741,7 +741,7 @@ void * call_rrd_update(void*arg){
 		opterr = 0;
 		rrd_update (rrd.argc, rrd.argv);
 
-		//if (i++%1000 == 0)printf("RRD\n");
+		//if (i++%1000 == 0)printf("RRD\n"); 
 	
 		/* Check errors */
 		if (rrd_test_error ())

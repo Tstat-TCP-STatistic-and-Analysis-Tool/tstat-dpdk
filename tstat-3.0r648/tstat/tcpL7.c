@@ -28,6 +28,7 @@
 /* log(2) used in the entropy computation */
 #define LOG2 0.6931471805599453
 
+void compute_nibbles_entropy (tcp_pair *ptp);
 int map_flow_type(tcp_pair *thisflow);
 
 extern struct L4_bitrates L4_bitrate;
@@ -429,12 +430,20 @@ void mse_protocol_check(tcp_pair *ptp)
        length_test = TRUE;
      }
   }
-     
-  if (length_test == TRUE && ptp->entropy_h>ENTROPY_THRESHOLD && 
-                             ptp->entropy_l>ENTROPY_THRESHOLD )
-    if (ptp->con_type==UNKNOWN_PROTOCOL)
-      /* Don't overwrite existing classification with MSE/PE */
-      ptp->con_type |= MSE_PROTOCOL; 
+  
+  if (length_test == TRUE)
+   {
+     if (ptp->entropy_h_valid!=1 || ptp->entropy_l_valid!=1)
+      {
+	compute_nibbles_entropy(ptp);
+      }
+      
+     if ( ptp->entropy_h>ENTROPY_THRESHOLD && 
+          ptp->entropy_l>ENTROPY_THRESHOLD )
+       if (ptp->con_type==UNKNOWN_PROTOCOL)
+         /* Don't overwrite existing classification with MSE/PE */
+         ptp->con_type |= MSE_PROTOCOL; 
+   }
 
  return;
  
@@ -499,6 +508,53 @@ void msn_s2c_state_update(tcp_pair *ptp, int state,int http_tunneling, void *pda
 }
 #endif
 
+void compute_nibbles_entropy (tcp_pair *ptp)
+{
+/* Compute information entropy over high and low nibbles (4 bits)
+   of the available payload. Only the first four payload packets are
+   considered. 
+*/
+  int i;
+  double probi;
+
+  if (ptp == NULL)
+    return;
+
+  if (ptp->entropy_h_valid == 0)
+   {
+     ptp->entropy_h = 0.0;
+     if (ptp->nibble_h_count>0)
+      {
+        for (i=0; i<16;i++)
+         {
+           if (ptp->nibbles_h[i]==0) continue;
+           probi = ptp->nibbles_h[i]*1.0/ptp->nibble_h_count;
+           ptp->entropy_h += (-1.0)*probi*log(probi);
+         }
+        ptp->entropy_h /= LOG2;
+        ptp->entropy_h_valid = 1;
+      }
+   }
+
+  if (ptp->entropy_l_valid == 0)
+   {
+     ptp->entropy_l = 0.0;
+     if (ptp->nibble_l_count>0)
+      {
+        for (i=0; i<16;i++)
+         {
+           if (ptp->nibbles_l[i]==0) continue;
+           probi = ptp->nibbles_l[i]*1.0/ptp->nibble_l_count;
+           ptp->entropy_l += (-1.0)*probi*log(probi);
+         }
+        ptp->entropy_l /= LOG2;
+        ptp->entropy_l_valid = 1;
+      }
+   }
+
+  return;
+}
+
 void compute_nibbles (struct ip *pip, void *pproto, int tproto, void *pdir,
 	       int dir, void *hdr, void *plast)
 {
@@ -512,7 +568,6 @@ void compute_nibbles (struct ip *pip, void *pproto, int tproto, void *pdir,
   int i;
   char c;
   char c1,c2;
-  double probi;
 
   tcphdr *ptcp;
   ptcp = (tcphdr *) hdr;
@@ -546,34 +601,12 @@ void compute_nibbles (struct ip *pip, void *pproto, int tproto, void *pdir,
 
      ptp->nibbles_l[(int)c1]++;
      ptp->nibble_l_count++;
+     ptp->entropy_l_valid = 0;
      ptp->nibbles_h[(int)c2]++;
      ptp->nibble_h_count++;
+     ptp->entropy_h_valid = 0;
    }
    ptp->nibble_packet_count++;
-
-   ptp->entropy_h = 0.0;
-   if (ptp->nibble_h_count>0)
-    {
-      for (i=0; i<16;i++)
-      {
-        if (ptp->nibbles_h[i]==0) continue;
-        probi = ptp->nibbles_h[i]*1.0/ptp->nibble_h_count;
-        ptp->entropy_h += (-1.0)*probi*log(probi);
-      }
-      ptp->entropy_h /= LOG2;
-    }
-
-   ptp->entropy_l = 0.0;
-   if (ptp->nibble_l_count>0)
-    {
-      for (i=0; i<16;i++)
-      {
-        if (ptp->nibbles_l[i]==0) continue;
-        probi = ptp->nibbles_l[i]*1.0/ptp->nibble_l_count;
-        ptp->entropy_l += (-1.0)*probi*log(probi);
-      }
-      ptp->entropy_l /= LOG2;
-    }
 
   return;
 }

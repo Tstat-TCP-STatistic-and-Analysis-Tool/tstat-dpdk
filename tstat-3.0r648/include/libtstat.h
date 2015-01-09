@@ -33,6 +33,8 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
+extern long int tcp_cleaned;
+extern long int udp_cleaned;
 int tstat_init (char *config_fname);
 void tstat_new_logdir (char *filename, struct timeval *pckt_time);
 int tstat_next_pckt (struct timeval *pckt_time, void *ip_hdr, void *last_ip_byte, int tlen, int ip_direction); 

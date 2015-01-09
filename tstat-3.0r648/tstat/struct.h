@@ -697,6 +697,8 @@ struct stcp_pair
   u_int16_t nibble_packet_count;
   double entropy_l;
   double entropy_h;
+  u_int16_t entropy_l_valid;
+  u_int16_t entropy_h_valid;
 
   /* rtmp identification */
   unsigned state_rtmp_c2s_seen:1;

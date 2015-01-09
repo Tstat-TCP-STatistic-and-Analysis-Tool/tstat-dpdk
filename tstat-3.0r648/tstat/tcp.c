@@ -22,6 +22,9 @@
 #include "videoL7.h"
 #include <regex.h>
 
+long int tcp_cleaned = 0;
+long int udp_cleaned = 0;
+
 /* provided globals  */
 extern FILE *fp_logc;
 extern FILE *fp_lognc;
@@ -1528,7 +1531,7 @@ trace_done_periodic ()
   tcp_pair *ptp;
   udp_pair *pup;
   int ix, dir, j;
-  unsigned int cleaned = 0;
+  //unsigned int cleaned = 0;
   unsigned long init_tot_conn = tot_conn_TCP;
   extern ptp_snap *ptp_hashtable[];
 
@@ -1603,7 +1606,7 @@ trace_done_periodic ()
 		}
 	    }
 	  /* must be cleaned */
-	  cleaned++;
+	  tcp_cleaned++;
 
 	  make_conn_stats (ptp, (ptp->s2c.syn_count > 0)
 			   && (ptp->c2s.syn_count > 0));
@@ -1658,7 +1661,7 @@ trace_done_periodic ()
 
   if (printticks && debug > 1)
     fprintf (fp_stdout,
-	     "\rCleaned %d/(%ld) TCP flows\n", cleaned, init_tot_conn);
+	     "\rCleaned %d/(%ld) TCP flows\n", udp_cleaned, init_tot_conn);
 
   if (do_udp == FALSE)
     return;
@@ -1668,7 +1671,7 @@ trace_done_periodic ()
   if (printticks && debug > 1)
     fprintf (fp_stdout, "Start cleaning UDP flows\n");
 
-  cleaned = 0;
+  //cleaned = 0;
   init_tot_conn = tot_conn_UDP;
   for (ix = udp_index; ix < MAX_UDP_PAIRS; ix += MAX_UDP_PAIRS / MAX_UDP_PAIRS_BURST )
     {
@@ -1686,11 +1689,11 @@ trace_done_periodic ()
 	  ||
           (elapsed (pup->last_time, current_time) > UDP_IDLE_TIME))
 	{close_udp_flow (pup, ix, dir);
-         cleaned++;}
+         udp_cleaned++;}
 #else
       if ((elapsed (pup->last_time, current_time) > UDP_IDLE_TIME))
 	{close_udp_flow (pup, ix, dir);
-         cleaned++;}
+         udp_cleaned++;}
 #endif
 
     }
@@ -1702,7 +1705,7 @@ trace_done_periodic ()
 
   if (printticks && debug > 1)
     fprintf (fp_stdout,
-	     "\rCleaned %d/(%ld) UDP flows\n", cleaned, init_tot_conn);
+	     "\rCleaned %d/(%ld) UDP flows\n", udp_cleaned, init_tot_conn);
 }
 
 void

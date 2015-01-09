@@ -53,3 +53,27 @@ Where:
 	4) -p N_INST : number of this instance. Must be between 0 and TOT_INST-1
 NOTE: the first two arguments are DPDK EAL ones. Infact each argument is given before the '--' is passed to EAL.
 See DPDK getting started guide for further details.
+
+DPDK CONF EXAMPLE SCRIPT * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+#THIS SCRIPT STARTS DPDK ENVIROMENT. MUST EXECUTE AS SUPER USER
+
+#Set CPU governor on performance
+sudo cpufreq-set -r -g performance
+
+#create enviromente variable (so must execute the script in this way: '. ./start_env.sh' )
+export RTE_SDK=/home/testuser/intel-dpdk-enviroment/dpdk-1.7.1
+export RTE_TARGET=x86_64-native-linuxapp-gcc
+
+#creatig and mounting hugepages
+sudo echo 6144 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+sudo mount -t hugetlbfs nodev /mnt/huge
+
+#loading modules
+sudo modprobe uio
+sudo insmod $RTE_SDK/$RTE_TARGET/kmod/igb_uio.ko
+
+#Binding interfaces to DPDK drivers
+$RTE_SDK/tools/dpdk_nic_bind.py --bind=igb_uio 01:00.0
+$RTE_SDK/tools/dpdk_nic_bind.py --bind=igb_uio 01:00.1
+
+

@@ -1,10 +1,13 @@
 LIBSTAT-DPDK
 
-REQUIREMENTS * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+REQUIREMENTS *********************************************************************************************************************************************
 This software is taylored in Intel 82599. So it has been tested only on that NICs. Probably will work with every NIC supporting RSS.
 
+NOTES ***************************************************************************************************************************************************
+1. Please use DPDK 1.7.1
+2. Install RRDTool (http://oss.oetiker.ch/rrdtool/) before compiling Tstat.
 
-INSTALLATION * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+INSTALLATION *********************************************************************************************************************************************
 1) Install DPDK:
 	- We suggest to use the getting started guide ( http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf ). Otherwise DPDK installation directory could not be found by Makefile.
 2) Reserve a big number of hugepages to DPDK:
@@ -29,7 +32,7 @@ INSTALLATION * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	- make
 
 
-USAGE: * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+USAGE: ************************************************************************************************************************************************
 To use the cluster please read about Tstat configuration on http://tstat.polito.it/HOWTO.shtml .
 By default Tstat configuration file is tstatX.conf/ in the subdirectory tstat-conf where X in the number of the instance.
 Infact each Tstat instance has got a different conf file in order to potentially keep separated logs and histograms directory.
@@ -54,7 +57,7 @@ Where:
 NOTE: the first two arguments are DPDK EAL ones. Infact each argument is given before the '--' is passed to EAL.
 See DPDK getting started guide for further details.
 
-DPDK CONF EXAMPLE SCRIPT * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+DPDK CONF EXAMPLE SCRIPT ****************************************************************************************************************************************
 #THIS SCRIPT STARTS DPDK ENVIROMENT. MUST EXECUTE AS SUPER USER
 
 #Set CPU governor on performance

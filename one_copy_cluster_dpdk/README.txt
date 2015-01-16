@@ -1,5 +1,11 @@
 LIBSTAT-DPDK
 
+WHAT IS THIS SOFTWARE ***********************************************************************************************************************************
+This program is a particular version of Tstat which uses Intel Data Plane Development Kit to retreive packets from network interfaces (NICs).
+It uses a multicore approach to achieve high speed. So it's important to know the number of cores you CPU has.
+It starts several indipendent instances of Tstat. Each instance will be fed by a portion of the incoming traffic.
+So the each Tstat instance produces its own output in different directories.
+
 REQUIREMENTS *********************************************************************************************************************************************
 This software is taylored on Intel 82599 NIC. So it has been tested only on that NICs. Probably will work with every NIC supporting RSS and DPDK.
 

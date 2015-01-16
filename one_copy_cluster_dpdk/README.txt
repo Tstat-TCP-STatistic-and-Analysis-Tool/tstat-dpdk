@@ -1,11 +1,11 @@
 LIBSTAT-DPDK
 
 REQUIREMENTS *********************************************************************************************************************************************
-This software is taylored in Intel 82599. So it has been tested only on that NICs. Probably will work with every NIC supporting RSS.
+This software is taylored on Intel 82599 NIC. So it has been tested only on that NICs. Probably will work with every NIC supporting RSS and DPDK.
 
 NOTES ***************************************************************************************************************************************************
-1. Please use DPDK 1.7.1
-2. Install RRDTool (http://oss.oetiker.ch/rrdtool/) before compiling Tstat.
+1. Please use DPDK 1.7.1 (http://dpdk.org/browse/dpdk/snapshot/dpdk-1.7.1.tar.gz)
+2. Install RRDTool to have better experience with Tstat (http://oss.oetiker.ch/rrdtool/) before compiling Tstat.
 
 INSTALLATION *********************************************************************************************************************************************
 1) Install DPDK:
@@ -13,7 +13,7 @@ INSTALLATION *******************************************************************
 2) Reserve a big number of hugepages to DPDK:
 	- echo 6144 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 	- mount -t hugetlbfs nodev /mnt/huge
-3) Bind interface you want to use with DPDK drivers:
+3) Bind interfaces you want to use with DPDK drivers:
 	- modprobe uio
 	- insmod build/kmod/igb_uio.ko
 	- tools/dpdk_nic_bind.py --bind=igb_uio eth0 ...
@@ -28,7 +28,7 @@ INSTALLATION *******************************************************************
 	- make install
 6) Install cluster-dpdk
 	- Decompress the archive
-	- ensure RTE_SDK and RTE_TARGET env variables are set, see DPDK doc.
+	- ensure RTE_SDK and RTE_TARGET env variables are set and point to DPDK installation directory, see DPDK Getting Started Guide.
 	- make
 
 

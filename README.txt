@@ -125,7 +125,7 @@ Having one configuration file for each Tstat istance let you to specify manually
 # 5. Usage
 ## 5.1 How to start it
 To start Tstat-DPDK **go in `installation-dir/one_copy_cluster_dpdk`.** Then use the provided script to start it.
-Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs to core.
+Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs two cores.
 If you want to start 2 instances, type:
 ```bash
 	./scripts/start_2_istances.sh

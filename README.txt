@@ -119,7 +119,7 @@ Network devices using kernel driver
 ## 4.4  Set up Tstat configuration
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-conf` there is a set of files: `tstat00.conf`, `tstat01.conf` ecc...
 This are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins and RRDTool engine.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage it's not mandatory).
+Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage is not mandatory).
 
 
 # 5. Usage
@@ -130,7 +130,7 @@ If you want to start 2 instances, type:
 ```bash
 	./scripts/start_2_istances.sh
 ```
-The system approximately each one seconds prints statstics about its performances, a line each instance.
+The system approximately each one seconds prints statistics about its performances, a line each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
 The output includes also the incoming rate in Mpps and the eventual packets' losing rate (in case of losses). You can see also the occupation of the internal buffer.
 The ouput has got this form.

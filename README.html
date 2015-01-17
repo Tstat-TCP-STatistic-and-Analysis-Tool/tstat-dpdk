@@ -101,7 +101,7 @@ Network devices using kernel driver
 </code></pre><h2 id="4-4-set-up-tstat-configuration">4.4  Set up Tstat configuration</h2>
 <p>In the directory <code>installation-dir/one_copy_cluster_dpdk/tstat-conf</code> there is a set of files: <code>tstat00.conf</code>, <code>tstat01.conf</code> ecc...
 This are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins and RRDTool engine.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage it&#39;s not mandatory).</p>
+Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage is not mandatory).</p>
 <h1 id="5-usage">5. Usage</h1>
 <h2 id="5-1-how-to-start-it">5.1 How to start it</h2>
 <p>To start Tstat-DPDK <strong>go in <code>installation-dir/one_copy_cluster_dpdk</code>.</strong> Then use the provided script to start it.
@@ -109,7 +109,7 @@ Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat ins
 If you want to start 2 instances, type:</p>
 <pre><code class="lang-bash">    ./scripts/start_2_istances.sh
 </code></pre>
-<p>The system approximately each one seconds prints statstics about its performances, a line each instance.
+<p>The system approximately each one seconds prints statistics about its performances, a line each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
 The output includes also the incoming rate in Mpps and the eventual packets&#39; losing rate (in case of losses). You can see also the occupation of the internal buffer.
 The ouput has got this form.</p>

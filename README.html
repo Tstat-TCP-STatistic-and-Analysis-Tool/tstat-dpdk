@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Untitled Document.md</title><style></style></head><body>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tstat-DPDK Readme</title><style></style></head><body>
 <h1 id="tstat-dpdk">Tstat-DPDK</h1>
 <h1 id="1-description-of-the-software">1. Description of the software</h1>
 <p>This program is a particular version of Tstat which uses Intel Data Plane Development Kit to retreive packets from network interfaces (NICs).
@@ -100,8 +100,9 @@ Network devices using kernel driver
 0000:03:00.0 &#39;NetXtreme BCM5719 Gigabit Ethernet PCIe&#39; if=eth0 drv=tg3 unused=igb_uio *Active*
 </code></pre><h2 id="4-4-set-up-tstat-configuration">4.4  Set up Tstat configuration</h2>
 <p>In the directory <code>installation-dir/one_copy_cluster_dpdk/tstat-conf</code> there is a set of files: <code>tstat00.conf</code>, <code>tstat01.conf</code> ecc...
-This are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins and RRDTool engine.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage is not mandatory).</p>
+Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
+Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own directory. 
+By deafult these directory are rrd_fastweb_liveXX where XX is the number of the instance. Anyway RRD usage is not mandatory.</p>
 <h1 id="5-usage">5. Usage</h1>
 <h2 id="5-1-how-to-start-it">5.1 How to start it</h2>
 <p>To start Tstat-DPDK <strong>go in <code>installation-dir/one_copy_cluster_dpdk</code>.</strong> Then use the provided script to start it.

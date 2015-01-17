@@ -118,8 +118,9 @@ Network devices using kernel driver
 ```
 ## 4.4  Set up Tstat configuration
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-conf` there is a set of files: `tstat00.conf`, `tstat01.conf` ecc...
-This are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins and RRDTool engine.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work (but RRDTool usage is not mandatory).
+Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
+Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own directory. 
+By deafult these directory are rrd_fastweb_liveXX where XX is the number of the instance. Anyway RRD usage is not mandatory.
 
 
 # 5. Usage

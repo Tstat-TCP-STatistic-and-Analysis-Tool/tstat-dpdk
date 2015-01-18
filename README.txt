@@ -6,6 +6,7 @@ This program is a particular version of Tstat which uses Intel Data Plane Develo
 It uses a multicore approach to achieve high speed. So it's important to know the number of cores you CPU has.
 It starts several **indipendent instances of Tstat**. Each instance will be fed by a portion of the incoming traffic.
 So the each Tstat instance produces its own output in different directories.
+
 * To understand Tstat please read: http://tstat.polito.it/HOWTO.shtml
 * For information about DPDK please read: http://dpdk.org/doc
 * For information about this Readme file and Tstat-DPDK please write to [martino.trevisan@studenti.polito.it](mailto:martino.trevisan@studenti.polito.it)
@@ -96,12 +97,15 @@ To achieve the best performances, your CPU must run always at the highest speed.
 	sudo cpufreq-set -r -g performance
 ```
 ## 4.3  Bind the interfaces you want to use with DPDK drivers
-It means that you have to load DPDK driver and associate it to you network interface. Remember to set `RTE_SDK` and `RTE_TARGET`.
+It means that you have to load DPDK driver and associate it to you network interface.
+Tstat-DPDK reads packets from all the interfaces bound to DPDK.
+Remember to set `RTE_SDK` and `RTE_TARGET` when executing the below commands.
 ```bash
 	sudo modprobe uio
 	sudo insmod $RTE_SDK/$RTE_TARGET/kmod/igb_uio.ko
 	sudo $RTE_SDK/tools/dpdk_nic_bind.py --bind=igb_uio $($RTE_SDK/tools/dpdk_nic_bind.py --status | sed -rn 's,.* if=([^ ]*).*igb_uio *$,\1,p')
 ```
+In this way all the DPDK-supported interfaces are working with DPDK drivers.
 To check if your network interfaces have been properly set by the Intel DPDK enviroment run:
 ```bash
 	sudo $RTE_SDK/tools/dpdk_nic_bind.py --status
@@ -116,11 +120,13 @@ Network devices using kernel driver
 ===================================
 0000:03:00.0 'NetXtreme BCM5719 Gigabit Ethernet PCIe' if=eth0 drv=tg3 unused=igb_uio *Active*
 ```
+**NOTE:** If for any reason you don't want to bind all the DPDK-supported interfaces to DPDK enviroment, use the `dpdk_nic_bind.py` as described in the DPDK getting started guide.
+
 ## 4.4  Set up Tstat configuration
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-conf` there is a set of files: `tstat00.conf`, `tstat01.conf` ecc...
 Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own directory. 
-By deafult these directory are rrd_fastweb_liveXX where XX is the number of the instance. Anyway RRD usage is not mandatory.
+Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own RRD directory. 
+By deafult these directory are `rrd_fastweb_liveXX` where XX is the number of the instance. Anyway RRD usage is not mandatory.
 
 
 # 5. Usage
@@ -177,4 +183,5 @@ RRD files directory is specified in the configuration files of Tstat.
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
 There are 3 columns which are respectively the mean, the max and the standard deviation of the per packet processing time.
+
 

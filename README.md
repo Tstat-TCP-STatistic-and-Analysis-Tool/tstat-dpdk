@@ -82,7 +82,11 @@ run this command to make the enviroment to find `libstat` shared object:
 ```
 
 # 4. Configuration of the machine
-Before running Tstat-DPDK there are few things to do:
+Before running Tstat-DPDK there are few things to do.
+
+**NOTE:** The steps 4.1, 4.2 and 4.3 can be automatically accomplished by the script `installation-dir/one_copy_cluster_dpdk/scripts/configure_machine.sh`.
+Please verify that script is doing the right operation for your system.
+
 ## 4.1 Reserve a big number of hugepages to DPDK
 The commands below reserve 6144 hugepages. Reserve about 512 * N, where N is the number of cores of your machine. The size of each huge page is 2MB. Check to have enough RAM on your machine.
 ```bash
@@ -92,7 +96,7 @@ The commands below reserve 6144 hugepages. Reserve about 512 * N, where N is the
 	mount -t hugetlbfs nodev /mnt/huge
 ```
 ## 4.2 Set CPU on performance governor
-To achieve the best performances, your CPU must run always at the highest speed. You need to have installed `cpufrequtils` package.
+To achieve the best performance, your CPU must run always at the highest speed. You need to have installed `cpufrequtils` package.
 ```bash
 	sudo cpufreq-set -r -g performance
 ```
@@ -125,8 +129,10 @@ Network devices using kernel driver
 ## 4.4  Set up Tstat configuration
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-conf` there is a set of files: `tstat00.conf`, `tstat01.conf` ecc...
 Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
-Having one configuration file for each Tstat instance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own RRD directory. 
-By deafult these directory are `rrd_fastweb_liveXX` where XX is the number of the instance. Anyway RRD usage is not mandatory.
+
+Having one configuration file for each Tstat instance let you to specify different RRDTool directory for different instances.
+This is necessary to make it work because each instance needs an its own RRD database and directory. 
+By deafult these directories are `rrd_fastweb_liveXX` where XX is the number of the instance. Anyway RRD usage is not mandatory.
 
 
 # 5. Usage
@@ -137,9 +143,9 @@ If you want to start 2 instances, type:
 ```bash
 	./scripts/start_2_instances.sh
 ```
-The system approximately each one seconds prints statistics about its performances, a line each instance.
+Approximatively every second, the system prints statistics about performance, one line for each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
-The output includes also the incoming rate in Mpps and the eventual packets' losing rate (in case of losses). You can see also the occupation of the internal buffer.
+The output includes also the incoming rate in Mpps and the eventual packet loss rate (in case of losses). You can see also the occupation of the internal buffer.
 The ouput has got this form.
 ```
 Instance: 0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%
@@ -175,11 +181,13 @@ UDP flows: 0
 Time elapsed: 2879.215s
 ```
 ## 5.3 Log files directory
-Tstat produces several logs file for different events seen on the network.
-Log files are keep separate for each instance and they are put in `installation-dir/one_copy_cluster_dpdk/tstatXX.log.out` where `XX` is the number of Tstat instance.
-It cannot be modified.
-RRD files directory is specified in the configuration files of Tstat.
-## 5.4 Statistics of the system
+Tstat produces several log files for different events seen on the network.
+Log files are keep separated for each instance and they are put in `installation-dir/one_copy_cluster_dpdk/tstatXX.log.out` where `XX` is the number of Tstat instance.
+The name of these directories is hardcoded in the software and cannot be modified.
+
+On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (remember: each instance must have its different database in different directories).
+
+## 5.4 System performance logs
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
 There are 3 columns which are respectively the mean, the max and the standard deviation of the per packet processing time.

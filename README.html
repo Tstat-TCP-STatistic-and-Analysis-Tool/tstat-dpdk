@@ -637,7 +637,6 @@
 
 
 
-
 <h1 id="tstat-dpdk">Tstat-DPDK</h1>
 <h1 id="1-description-of-the-software">1. Description of the software</h1>
 <p>This program is a particular version of Tstat which uses Intel Data Plane Development Kit to retreive packets from network interfaces (NICs).
@@ -708,7 +707,9 @@ For documentation and details see <a href="http://dpdk.org/doc/intel/dpdk-start-
 <pre><code class="lang-bash">    <span class="hljs-keyword">export</span> LD_LIBRARY_PATH=/usr/local/lib
 </code></pre>
 <h1 id="4-configuration-of-the-machine">4. Configuration of the machine</h1>
-<p>Before running Tstat-DPDK there are few things to do:</p>
+<p>Before running Tstat-DPDK there are few things to do.</p>
+<p><strong>NOTE:</strong> The steps 4.1, 4.2 and 4.3 can be automatically accomplished by the script <code>installation-dir/one_copy_cluster_dpdk/scripts/configure_machine.sh</code>.
+Please verify that script is doing the right operation for your system.</p>
 <h2 id="4-1-reserve-a-big-number-of-hugepages-to-dpdk">4.1 Reserve a big number of hugepages to DPDK</h2>
 <p>The commands below reserve 6144 hugepages. Reserve about 512 * N, where N is the number of cores of your machine. The size of each huge page is 2MB. Check to have enough RAM on your machine.</p>
 <pre><code class="lang-bash">    <span class="hljs-built_in">sudo</span> su
@@ -717,7 +718,7 @@ For documentation and details see <a href="http://dpdk.org/doc/intel/dpdk-start-
     mount -t hugetlbfs nodev /mnt/huge
 </code></pre>
 <h2 id="4-2-set-cpu-on-performance-governor">4.2 Set CPU on performance governor</h2>
-<p>To achieve the best performances, your CPU must run always at the highest speed. You need to have installed <code>cpufrequtils</code> package.</p>
+<p>To achieve the best performance, your CPU must run always at the highest speed. You need to have installed <code>cpufrequtils</code> package.</p>
 <pre><code class="lang-bash">    <span class="hljs-built_in">sudo</span> cpufreq-set -r -g performance
 </code></pre>
 <h2 id="4-3-bind-the-interfaces-you-want-to-use-with-dpdk-drivers">4.3  Bind the interfaces you want to use with DPDK drivers</h2>
@@ -743,19 +744,20 @@ Network devices using kernel driver
 </code></pre><p><strong>NOTE:</strong> If for any reason you don&#39;t want to bind all the DPDK-supported interfaces to DPDK enviroment, use the <code>dpdk_nic_bind.py</code> as described in the DPDK getting started guide.</p>
 <h2 id="4-4-set-up-tstat-configuration">4.4  Set up Tstat configuration</h2>
 <p>In the directory <code>installation-dir/one_copy_cluster_dpdk/tstat-conf</code> there is a set of files: <code>tstat00.conf</code>, <code>tstat01.conf</code> ecc...
-Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own RRD directory. 
-By deafult these directory are <code>rrd_fastweb_liveXX</code> where XX is the number of the instance. Anyway RRD usage is not mandatory.</p>
+Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.</p>
+<p>Having one configuration file for each Tstat instance let you to specify different RRDTool directory for different instances.
+This is necessary to make it work because each instance needs an its own RRD database and directory. 
+By deafult these directories are <code>rrd_fastweb_liveXX</code> where XX is the number of the instance. Anyway RRD usage is not mandatory.</p>
 <h1 id="5-usage">5. Usage</h1>
 <h2 id="5-1-how-to-start-it">5.1 How to start it</h2>
 <p>To start Tstat-DPDK <strong>go in <code>installation-dir/one_copy_cluster_dpdk</code>.</strong> Then use the provided script to start it.
 Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs two cores.
 If you want to start 2 instances, type:</p>
-<pre><code class="lang-bash">    ./scripts/start_2_istances.sh
+<pre><code class="lang-bash">    ./scripts/start_2_instances.sh
 </code></pre>
-<p>The system approximately each one seconds prints statistics about its performances, a line each instance.
+<p>Approximatively every second, the system prints statistics about performance, one line for each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
-The output includes also the incoming rate in Mpps and the eventual packets&#39; losing rate (in case of losses). You can see also the occupation of the internal buffer.
+The output includes also the incoming rate in Mpps and the eventual packet loss rate (in case of losses). You can see also the occupation of the internal buffer.
 The ouput has got this form.</p>
 <pre><code>Instance: 0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%
 Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%
@@ -772,25 +774,25 @@ PORT: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
     Queue 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
     Queue 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 
-ISTANCE: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 TSTAT STATISTICS:
 Total packets: 0
 TCP flows: 0
 UDP flows: 0
 Time elapsed: 2880.317s
 
-ISTANCE: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 TSTAT STATISTICS:
 Total packets: 0
 TCP flows: 0
 UDP flows: 0
 Time elapsed: 2879.215s
 </code></pre><h2 id="5-3-log-files-directory">5.3 Log files directory</h2>
-<p>Tstat produces several logs file for different events seen on the network.
-Log files are keep separate for each instance and they are put in <code>installation-dir/one_copy_cluster_dpdk/tstatXX.log.out</code> where <code>XX</code> is the number of Tstat instance.
-It cannot be modified.
-RRD files directory is specified in the configuration files of Tstat.</p>
-<h2 id="5-4-statistics-of-the-system">5.4 Statistics of the system</h2>
+<p>Tstat produces several log files for different events seen on the network.
+Log files are keep separated for each instance and they are put in <code>installation-dir/one_copy_cluster_dpdk/tstatXX.log.out</code> where <code>XX</code> is the number of Tstat instance.
+The name of these directories is hardcoded in the software and cannot be modified.</p>
+<p>On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (remember: each instance must have its different database in different directories).</p>
+<h2 id="5-4-system-performance-logs">5.4 System performance logs</h2>
 <p>In the directory <code>installation-dir/one_copy_cluster_dpdk/tstat-stats</code> there is a set of file called <code>statsXX.txt</code>.
 Each instance writes in its own file (the <code>XX</code> in the name of the file is its number) statistics while it is running.
 There are 3 columns which are respectively the mean, the max and the standard deviation of the per packet processing time.</p>

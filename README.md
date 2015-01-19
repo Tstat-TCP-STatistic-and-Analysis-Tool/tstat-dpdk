@@ -125,7 +125,7 @@ Network devices using kernel driver
 ## 4.4  Set up Tstat configuration
 In the directory `installation-dir/one_copy_cluster_dpdk/tstat-conf` there is a set of files: `tstat00.conf`, `tstat01.conf` ecc...
 Those are the configuration files of each Tstat process. Configure it as you prefer; the default configuration includes all plugins, RRDTool engine and CryptoPAn anonymization.
-Having one configuration file for each Tstat istance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own RRD directory. 
+Having one configuration file for each Tstat instance let you to specify manually RRDTool directory. This is necessary to make it work because each instance needs an its own RRD directory. 
 By deafult these directory are `rrd_fastweb_liveXX` where XX is the number of the instance. Anyway RRD usage is not mandatory.
 
 
@@ -135,7 +135,7 @@ To start Tstat-DPDK **go in `installation-dir/one_copy_cluster_dpdk`.** Then use
 Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs two cores.
 If you want to start 2 instances, type:
 ```bash
-	./scripts/start_2_istances.sh
+	./scripts/start_2_instances.sh
 ```
 The system approximately each one seconds prints statistics about its performances, a line each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
@@ -160,14 +160,14 @@ PORT: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 	Queue 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 	Queue 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 
-ISTANCE: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 TSTAT STATISTICS:
 Total packets: 0
 TCP flows: 0
 UDP flows: 0
 Time elapsed: 2880.317s
 
-ISTANCE: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
 TSTAT STATISTICS:
 Total packets: 0
 TCP flows: 0

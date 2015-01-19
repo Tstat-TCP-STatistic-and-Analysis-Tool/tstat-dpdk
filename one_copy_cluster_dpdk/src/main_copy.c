@@ -319,7 +319,7 @@ static void sig_handler(int signo)
 		/* Every process prints per instance stats and tstat stats */
 		tstat_report report;
     		tstat_close(&report);
-		printf("\nISTANCE: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%\n", nb_istance, nb_tstat_packets, nb_drop,  nb_tstat_packets + nb_drop, (float)nb_drop/(nb_drop+nb_tstat_packets)*100);
+		printf("\nINSTANCE: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%\n", nb_istance, nb_tstat_packets, nb_drop,  nb_tstat_packets + nb_drop, (float)nb_drop/(nb_drop+nb_tstat_packets)*100);
 		printf("TSTAT STATISTICS:\n");
 		/* Can use instead  tstat_print_report(&report, stdout); */
 		printf("Total packets: %lu\nTCP flows: %lu\nUDP flows: %lu\nTime elapsed: %.3lfs\n", report.pnum, report.f_TCP_count, report.f_UDP_count, report.wallclock / 1000000 );

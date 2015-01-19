@@ -752,7 +752,7 @@ By deafult these directories are <code>rrd_fastweb_liveXX</code> where XX is the
 <p>To start Tstat-DPDK <strong>go in <code>installation-dir/one_copy_cluster_dpdk</code>.</strong> Then use the provided script to start it.
 Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs two cores.
 If you want to start 2 instances, type:</p>
-<pre><code class="lang-bash">    ./scripts/start_2_instances.sh
+<pre><code class="lang-bash">    sudo ./scripts/start_2_instances.sh
 </code></pre>
 <p>Approximatively every second, the system prints statistics about performance, one line for each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
@@ -762,7 +762,7 @@ The ouput has got this form.</p>
 Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%
 </code></pre><h2 id="5-2-how-to-stop-it">5.2 How to stop it</h2>
 <p>To stop Tstat-DPDK, type:</p>
-<pre><code class="lang-bash">    ./scripts/quit_instances.sh
+<pre><code class="lang-bash">    sudo ./scripts/quit_instances.sh
 </code></pre>
 <p>The system will quit and it will print overall statistics on its working divided by network interface and by instance.
 The output has this form.</p>

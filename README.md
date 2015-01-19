@@ -140,7 +140,7 @@ To start Tstat-DPDK **go in `installation-dir/one_copy_cluster_dpdk`.** Then use
 Decide how many instances of Tstat-DPDK you want to run in parallel: a Tstat instance needs two cores.
 If you want to start 2 instances, type:
 ```bash
-	./scripts/start_2_instances.sh
+	sudo ./scripts/start_2_instances.sh
 ```
 Approximatively every second, the system prints statistics about performance, one line for each instance.
 The information are about average, maximum, and standard deviation of per-packet processing time. There is the number of TCP and UDP flows closed.
@@ -153,7 +153,7 @@ Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 R
 ## 5.2 How to stop it
 To stop Tstat-DPDK, type:
 ```bash
-	./scripts/quit_instances.sh
+	sudo ./scripts/quit_instances.sh
 ```
 The system will quit and it will print overall statistics on its working divided by network interface and by instance.
 The output has this form.

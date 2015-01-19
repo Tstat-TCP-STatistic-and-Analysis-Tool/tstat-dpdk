@@ -712,10 +712,9 @@ For documentation and details see <a href="http://dpdk.org/doc/intel/dpdk-start-
 Please verify that script is doing the right operation for your system.</p>
 <h2 id="4-1-reserve-a-big-number-of-hugepages-to-dpdk">4.1 Reserve a big number of hugepages to DPDK</h2>
 <p>The commands below reserve 6144 hugepages. Reserve about 512 * N, where N is the number of cores of your machine. The size of each huge page is 2MB. Check to have enough RAM on your machine.</p>
-<pre><code class="lang-bash">    <span class="hljs-built_in">sudo</span> su
-    <span class="hljs-built_in">echo</span> <span class="hljs-number">6144</span> &gt;/sys/kernel/mm/hugepages/hugepages-<span class="hljs-number">2048</span>kB/nr_hugepages
-    mkdir -p /mnt/huge
-    mount -t hugetlbfs nodev /mnt/huge
+<pre><code class="lang-bash">    <span class="hljs-built_in">sudo</span> <span class="hljs-built_in">echo</span> <span class="hljs-number">6144</span> &gt; <span class="hljs-built_in">sudo</span> /sys/kernel/mm/hugepages/hugepages-<span class="hljs-number">2048</span>kB/nr_hugepages
+    <span class="hljs-built_in">sudo</span> mkdir -p /mnt/huge
+    <span class="hljs-built_in">sudo</span> mount -t hugetlbfs nodev /mnt/huge
 </code></pre>
 <h2 id="4-2-set-cpu-on-performance-governor">4.2 Set CPU on performance governor</h2>
 <p>To achieve the best performance, your CPU must run always at the highest speed. You need to have installed <code>cpufrequtils</code> package.</p>

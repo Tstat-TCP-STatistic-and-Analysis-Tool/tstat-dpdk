@@ -5,8 +5,9 @@
 #Set CPU governor on performance
 sudo cpufreq-set -r -g performance
 
-#Creating and mounting hugepages
-sudo echo 6144 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+#Creating and mounting hugepages. 
+sudo echo 6144 > sudo /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+sudo mkdir -p /mnt/huge
 sudo mount -t hugetlbfs nodev /mnt/huge
 
 #Loading modules

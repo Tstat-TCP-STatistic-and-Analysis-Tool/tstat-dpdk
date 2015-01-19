@@ -90,10 +90,9 @@ Please verify that script is doing the right operation for your system.
 ## 4.1 Reserve a big number of hugepages to DPDK
 The commands below reserve 6144 hugepages. Reserve about 512 * N, where N is the number of cores of your machine. The size of each huge page is 2MB. Check to have enough RAM on your machine.
 ```bash
-	sudo su
-	echo 6144 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-	mkdir -p /mnt/huge
-	mount -t hugetlbfs nodev /mnt/huge
+	sudo echo 6144 > sudo /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+	sudo mkdir -p /mnt/huge
+	sudo mount -t hugetlbfs nodev /mnt/huge
 ```
 ## 4.2 Set CPU on performance governor
 To achieve the best performance, your CPU must run always at the highest speed. You need to have installed `cpufrequtils` package.

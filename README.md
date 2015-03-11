@@ -10,8 +10,9 @@ Tstat-DPDK Quick Start Guide
 * [3. System Comfiguration](#conf)
     * [3.1 Reserve a large number of hugepages to DPDK](#conf-hugepage)
     * [3.2 Force CPUs clock to remain high](#conf-cpu)
-    * [3.3 Bind NICs to DPDK driver](#conf-nics)
-    * [3.4 Set up Tstat configurations](#conf-libtstat)    
+    * [3.3 Disable Address Layout Space Randomization](#alsr)
+    * [3.4 Bind NICs to DPDK driver](#conf-nics)
+    * [3.5 Set up Tstat configurations](#conf-libtstat)    
 * [4. Run Tstat-DPDK](#run)
     * [4.1 Start Tstat Instances](#start)
     * [4.2 Stop Tstat Instances](#stop)
@@ -146,7 +147,7 @@ To improve memory handling, it is highly recommended to increase the number of `
 For instance, for a 8 core system this would result in `4096 hugepages`, i.e., 8GB of memory. In scenarios not suffering of strong memory constraints, we recommend to use `6144 hugepages`, i.e., 12GB of memory
 
 ```bash
-	sudo echo 6144 > sudo /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+	sudo bash -c "echo 6144 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
 	sudo mkdir -p /mnt/huge
 	sudo mount -t hugetlbfs nodev /mnt/huge
 ```
@@ -159,7 +160,14 @@ To achieve the best performance, your CPU must run always at the highest speed. 
 	sudo cpufreq-set -r -g performance
 ```
 
-## 3.3 <a name="conf-nics"></a> Bind NICs to DPDK driver
+## 3.3 <a name="alsr"></a>Disable Address Layout Space Randomization
+Address Layout Space Randomization (ALSR) is a useful feature of Linux systems. Unfortunaley sometimes it makes DPDK application not to start.
+So we suggest to disable it by means of this command:
+```bash
+	sudo bash -c "echo 0 > /proc/sys/kernel/randomize_va_space"
+```
+
+## 3.4 <a name="conf-nics"></a> Bind NICs to DPDK driver
 
 In able to use the DPDK framework on a NIC we need to change the driver associated to the network card. The driver is located within the `kmod` folder of the DPDK version compiled (recall the configuration of the `RTE_SDK` and `RTE_TARGET` used at compile time).
 
@@ -187,7 +195,7 @@ Network devices using kernel driver
 ```
 **NOTE:** If for any reason you don't want to bind all the DPDK-supported interfaces to DPDK enviroment, use the `dpdk_nic_bind.py` as described in the [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
-## 3.4  <a name="conf-libtstat"></a>Set up Tstat configurations
+## 3.5  <a name="conf-libtstat"></a>Set up Tstat configurations
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 

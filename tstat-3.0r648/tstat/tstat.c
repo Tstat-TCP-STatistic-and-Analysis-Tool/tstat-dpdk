@@ -59,6 +59,7 @@ static void Version (void);
 static int LoadInternalNets (char *file);
 static int LoadCloudNets (char *file);
 static int LoadCryptoNets (char *file);
+static int LoadWhiteNets (char *file);
 #ifndef TSTAT_RUNASLIB
 static void ProcessFile (char *filename, Bool last);
 #endif
@@ -125,6 +126,11 @@ struct in_addr crypto_net_list[MAX_CRYPTO_HOSTS];
 struct in_addr crypto_net_mask2[MAX_CRYPTO_HOSTS];
 int crypto_net_mask[MAX_CRYPTO_HOSTS];
 int tot_crypto_nets;
+
+struct in_addr white_net_list[MAX_WHITE_HOSTS];
+struct in_addr white_net_mask2[MAX_WHITE_HOSTS];
+int white_net_mask[MAX_WHITE_HOSTS];
+int tot_white_nets;
 
 unsigned int ip_obfuscate_mask = 0x00000000; /* This is already in network order */
 
@@ -325,6 +331,7 @@ Bool internal_wired = FALSE;
 Bool net_conf = FALSE;
 Bool cloud_conf = FALSE;
 Bool crypto_conf = FALSE;
+Bool white_conf = FALSE;
 Bool net6_conf = FALSE;
 Bool eth_conf = FALSE;
 
@@ -382,6 +389,7 @@ Help (void)
     "\t      [-C file]\n"
     "\t      [-Y file]\n"
     "\t      [--keyvalue key | --keyfile file | --keybase64 file]\n"
+    "\t      [-W file]\n"
     "\t      [-B bayes.conf]\n"
     "\t      [-T runtime.conf]\n"
     "\t      [-z file]\n"
@@ -468,6 +476,13 @@ Help (void)
     "\t         key for address anonymization.\n"
     "\t         Valid only if the -Y option is also specified. Only one option\n"
     "\t         among --keyvalue, --keyfile, and --keybase64 can be used.\n"
+    "\n"
+    "\t-W file: specify the file name which contains the\n"
+    "\t         description of the whitelisted hosts/networks.\n"
+    "\t         This file must contain the subnets for which the IPv4 address\n"
+    "\t         will be whitelisted and *NOT* anonymized using the Crypto-PAn algorithm.\n"
+    "\t         Subnets are specified like in the -N option.\n"
+    "\t         Meaningful only if the -Y option is also specified.\n"
     "\n"
 	"\t-H ?: print internal histograms names and definitions\n"
     "\t-H file: Read histogram configuration from file\n"
@@ -1397,7 +1412,7 @@ create_new_outfiles (char *input_filename, Bool reuse_dir)
 {
   char tmpstr[FILENAME_SIZE+20];
   struct stat fbuf;
-  char date[50];
+  char date[100];
   char * filename;
 
   if (input_filename==NULL)filename = old_filename;
@@ -1415,11 +1430,13 @@ create_new_outfiles (char *input_filename, Bool reuse_dir)
           if (is_stdin || strcmp(filename, "TSTAT_RUNASLIB") == 0) {
               basenamedir = strdup ("stdin");
           } else {
-              basenamedir = get_basename (filename);
+              basenamedir = strdup (filename);
           }
       }
       if (stat (basenamedir, &fbuf) != 0) {
-          mkdir (basenamedir, 0775);
+	  sprintf(date, "mkdir -p %s", basenamedir);
+	  system(date);
+          //mkdir (basenamedir, 0775);
       }
       strftime (date, 49, "%Y_%m_%d_%H_%M", localtime (&current_time.tv_sec));
       sprintf (basename, "%s/%s.out", basenamedir, date);
@@ -3040,6 +3057,7 @@ CheckArguments (int *pargc, char *argv[])
     }
     if (crypto_conf == FALSE) {
         tot_crypto_nets = 0;
+	tot_white_nets = 0;
     }
 #ifdef SUPPORT_IPV6
     if (net6_conf == FALSE) {
@@ -3062,6 +3080,13 @@ CheckArguments (int *pargc, char *argv[])
        fprintf(fp_stdout, 
                "Warning: One encryption key option has been specified but no encrypted\n"
                "         networks have been defined with the -Y option. Encryption is disabled\n");
+     }
+     
+    if (crypto_conf == FALSE && white_conf == TRUE )
+     {
+       fprintf(fp_stdout, 
+               "Warning: A set of whitelisted networks has been provided but no encrypted\n"
+               "         networks have been defined with the -Y option.\n");
      }
 
 }
@@ -3102,7 +3127,7 @@ CheckArguments (int *pargc, char *argv[])
 #define HAVE_ZLIB_OPT ""
 #endif
 
-#define GLOBAL_OPTS "A:B:N:M:C:Y:H:s:T:z:gpdhtucSLvw32"
+#define GLOBAL_OPTS "A:B:N:M:C:Y:W:H:s:T:z:gpdhtucSLvw32"
 
 static void
 ParseArgs (int *pargc, char *argv[])
@@ -3237,6 +3262,18 @@ ParseArgs (int *pargc, char *argv[])
 	  crypto_conf = TRUE;
 	  crypto_source = CPKEY_RANDOM;
 	  crypto_value = NULL;
+	  break;
+	case 'W':
+	  /* -W file */
+	  tmpstring = strdup (optarg);
+	  if (!LoadWhiteNets (tmpstring))
+	    {
+	      fprintf (fp_stderr, 
+            "Error while loading configuration\n"
+	        "Wrong or missing %s\n", tmpstring);
+	      exit (1);
+	    }
+	  white_conf = TRUE;
 	  break;
 	case 'A':		/* Enable anonymization with the mask indicated */
 	   {
@@ -3385,7 +3422,10 @@ ParseArgs (int *pargc, char *argv[])
 	      }
 	    else
 	      {
-		mkdir (rrdpath, 0775);
+		char command[1000];
+		sprintf(command, "mkdir -p %s ", rrdpath);
+		system(command);
+		//mkdir (rrdpath, 0775);
 		if (debug)
 		  fprintf (fp_stdout,
 			   "RRDTool database path <%s> created\n", rrdpath);
@@ -3579,24 +3619,19 @@ ParseArgs (int *pargc, char *argv[])
   return;
 }
 
-
 int
-LoadInternalNets (char *file) {
-    FILE *fp;
+ParseNetFile (FILE *fp, char *qualifier, int max_entries, 
+              struct in_addr *CLASS_net_list,
+              struct in_addr *CLASS_net_mask2,
+              int *CLASS_net_mask,
+              int *tot_CLASS_nets) {
     char *line, *ip_string, *mask_string, *err;
     int i, len;
     long int mask_bits;
     unsigned int full_local_mask;
     char s[16];
-//    char *slash_p, *tmp;
 
-    fp = fopen(file, "r");
-    if (!fp) {
-        fprintf(fp_stderr, "Unable to open file '%s'\n", file);
-        return 0;
-    }
-
-    tot_internal_nets = 0;
+    (*tot_CLASS_nets) = 0;
     i = 0;
     while (1) {
         line = readline(fp, 1, 1);
@@ -3608,8 +3643,8 @@ LoadInternalNets (char *file) {
             line[len - 1] = '\0';
         ip_string = line;
 
-        if (i == MAX_INTERNAL_HOSTS) {
-            fprintf (fp_stderr, "Maximum number of internal hosts/networks (%d) exceeded\n", MAX_INTERNAL_HOSTS);
+        if (i == max_entries) {
+            fprintf (fp_stderr, "Maximum number of %s hosts/networks (%d) exceeded\n", qualifier, max_entries);
             return 0;
         }
 
@@ -3620,11 +3655,11 @@ LoadInternalNets (char *file) {
             mask_string = strtok(NULL,"/");
 
             if (!mask_string) {
-                fprintf(fp_stderr, "Missing ip or network mask in net config n.%d\n", (i+1));
+                fprintf(fp_stderr, "Missing ip or network mask in %s config n.%d\n", qualifier, (i+1));
                 return 0;
             }
-            if (!inet_aton (ip_string, &(internal_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in net config n.%d\n", (i+1));
+            if (!inet_aton (ip_string, &(CLASS_net_list[i]))) {
+                fprintf(fp_stderr, "Invalid ip address in %s config n.%d\n", qualifier, (i+1));
                 return 0;
             }
 
@@ -3634,11 +3669,11 @@ LoadInternalNets (char *file) {
                 err = NULL;
                 mask_bits = strtol(mask_string, &err, 10);
                 if (*err || mask_bits < 1 || mask_bits > 32) {
-                    fprintf(fp_stderr, "Invalid network mask in net config n.%d\n", (i+1));
+                    fprintf(fp_stderr, "Invalid network mask in %s config n.%d\n", qualifier, (i+1));
                     return 0;
                 }
 
-                if (internal_net_list[i].s_addr == 0)
+                if (CLASS_net_list[i].s_addr == 0)
                    full_local_mask = 0;
                 else
                    full_local_mask = 0xffffffff << (32 - mask_bits);
@@ -3648,69 +3683,84 @@ LoadInternalNets (char *file) {
                     (full_local_mask >> 16)  & 0x00ff,
                     (full_local_mask >> 8 ) & 0x0000ff,
                     full_local_mask & 0xff);
-                inet_aton (s, &(internal_net_mask2[i]));
-                internal_net_mask[i] = inet_addr(s);
-	        internal_net_list[i].s_addr &= internal_net_mask[i];
+                inet_aton (s, &(CLASS_net_mask2[i]));
+                CLASS_net_mask[i] = inet_addr(s);
+	        CLASS_net_list[i].s_addr &= CLASS_net_mask[i];
             }
             //mask in dotted format
             else
             {
-                if (!inet_aton (mask_string, &(internal_net_mask2[i]))) {
-                    fprintf(fp_stderr, "Invalid network mask in net config n.%d\n", (i+1));
+                if (!inet_aton (mask_string, &(CLASS_net_mask2[i]))) {
+                    fprintf(fp_stderr, "Invalid network mask in %s config n.%d\n", qualifier, (i+1));
                     return 0;
                 }
-                internal_net_mask[i] = inet_addr (mask_string);
-	        internal_net_list[i].s_addr &= internal_net_mask[i];
+                CLASS_net_mask[i] = inet_addr (mask_string);
+	        CLASS_net_list[i].s_addr &= CLASS_net_mask[i];
             }
         }
         //old format
         else
         {
-            if (!inet_aton (ip_string, &(internal_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in net config n.%d\n", (i+1));
+            if (!inet_aton (ip_string, &(CLASS_net_list[i]))) {
+                fprintf(fp_stderr, "Invalid ip address in %s config n.%d\n", qualifier, (i+1));
                 return 0;
             }
 
             mask_string = readline(fp, 1, 1);
             if (!mask_string){
-                fprintf(fp_stderr, "Missing network mask in net config n.%d\n", (i+1));
+                fprintf(fp_stderr, "Missing network mask in %s config n.%d\n", qualifier, (i+1));
                 return 0;
             }
 
             len = strlen(mask_string);
             if (mask_string[len - 1] == '\n')
                 mask_string[len - 1] = '\0';
-            if (!inet_aton (mask_string, &(internal_net_mask2[i]))) {
-                fprintf(fp_stderr, "Invalid network mask in net config n.%d\n", (i+1));
+            if (!inet_aton (mask_string, &(CLASS_net_mask2[i]))) {
+                fprintf(fp_stderr, "Invalid network mask in %s config n.%d\n", qualifier, (i+1));
                 return 0;
             }
-            internal_net_mask[i] = inet_addr (mask_string);
-	    internal_net_list[i].s_addr &= internal_net_mask[i];
+            CLASS_net_mask[i] = inet_addr (mask_string);
+	    CLASS_net_list[i].s_addr &= CLASS_net_mask[i];
         }
        if (debug)
         {
-            fprintf (fp_stdout, "Adding: %s as internal net ",
-                    inet_ntoa (internal_net_list[i]));
+            fprintf (fp_stdout, "Adding: %s as %s ",
+                    inet_ntoa (CLASS_net_list[i]),qualifier);
             fprintf (fp_stdout, "with mask %s (%u)\n", 
-                    inet_ntoa (internal_net_mask2[i]),
-                    internal_net_mask[i]);
+                    inet_ntoa (CLASS_net_mask2[i]),
+                    CLASS_net_mask[i]);
         }
 
-        tot_internal_nets++;
+        (*tot_CLASS_nets)++;
         i++;
     }
     return 1;
+}
+
+int
+LoadInternalNets (char *file) {
+    FILE *fp;
+    int retval;
+
+    fp = fopen(file, "r");
+    if (!fp) {
+        fprintf(fp_stderr, "Unable to open file '%s'\n", file);
+        return 0;
+    }
+
+    retval = ParseNetFile(fp,"internal",MAX_INTERNAL_HOSTS,
+			     internal_net_list,internal_net_mask2,
+			     internal_net_mask,&tot_internal_nets);
+   
+    fclose(fp);
+    
+    return retval;
 }
 
 int
 LoadCloudNets (char *file) {
     FILE *fp;
-    char *line, *ip_string, *mask_string, *err;
-    int i, len;
-    long int mask_bits;
-    unsigned int full_local_mask;
-    char s[16];
-//    char *slash_p, *tmp;
+    int retval;
 
     fp = fopen(file, "r");
     if (!fp) {
@@ -3718,121 +3768,19 @@ LoadCloudNets (char *file) {
         return 0;
     }
 
-    tot_cloud_nets = 0;
-    i = 0;
-    while (1) {
-        line = readline(fp, 1, 1);
-        if (!line)
-            break;
-
-        len = strlen(line);
-        if (line[len - 1] == '\n')
-            line[len - 1] = '\0';
-        ip_string = line;
-
-        if (i == MAX_CLOUD_HOSTS) {
-            fprintf (fp_stderr, "Maximum number of cloud hosts/networks (%d) exceeded\n", MAX_CLOUD_HOSTS);
-            return 0;
-        }
-
-        //single line format
-        if (strchr(ip_string,'/'))
-        {
-            ip_string = strtok(ip_string,"/");
-            mask_string = strtok(NULL,"/");
-
-            if (!mask_string) {
-                fprintf(fp_stderr, "Missing ip or network mask in cloud config n.%d\n", (i+1));
-                return 0;
-            }
-            if (!inet_aton (ip_string, &(cloud_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in cloud config n.%d\n", (i+1));
-                return 0;
-            }
-
-            //network mask as a single number
-            if (!strchr(mask_string,'.'))
-            { 
-                err = NULL;
-                mask_bits = strtol(mask_string, &err, 10);
-                if (*err || mask_bits < 1 || mask_bits > 32) {
-                    fprintf(fp_stderr, "Invalid network mask in cloud config n.%d\n", (i+1));
-                    return 0;
-                }
-
-                if (cloud_net_list[i].s_addr == 0)
-                   full_local_mask = 0;
-                else
-                   full_local_mask = 0xffffffff << (32 - mask_bits);
-
-                sprintf(s,"%d.%d.%d.%d",
-                    full_local_mask >> 24,
-                    (full_local_mask >> 16)  & 0x00ff,
-                    (full_local_mask >> 8 ) & 0x0000ff,
-                    full_local_mask & 0xff);
-                inet_aton (s, &(cloud_net_mask2[i]));
-                cloud_net_mask[i] = inet_addr(s);
-		cloud_net_list[i].s_addr &= cloud_net_mask[i];
-            }
-            //mask in dotted format
-            else
-            {
-                if (!inet_aton (mask_string, &(cloud_net_mask2[i]))) {
-                    fprintf(fp_stderr, "Invalid network mask in cloud config n.%d\n", (i+1));
-                    return 0;
-                }
-                cloud_net_mask[i] = inet_addr (mask_string);
-		cloud_net_list[i].s_addr &= cloud_net_mask[i];
-            }
-        }
-        //old format
-        else
-        {
-            if (!inet_aton (ip_string, &(cloud_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in cloud config n.%d\n", (i+1));
-                return 0;
-            }
-
-            mask_string = readline(fp, 1, 1);
-            if (!mask_string){
-                fprintf(fp_stderr, "Missing network mask in cloud config n.%d\n", (i+1));
-                return 0;
-            }
-
-            len = strlen(mask_string);
-            if (mask_string[len - 1] == '\n')
-                mask_string[len - 1] = '\0';
-            if (!inet_aton (mask_string, &(cloud_net_mask2[i]))) {
-                fprintf(fp_stderr, "Invalid network mask in cloud config n.%d\n", (i+1));
-                return 0;
-            }
-            cloud_net_mask[i] = inet_addr (mask_string);
-            cloud_net_list[i].s_addr &= cloud_net_mask[i];
-        }
-       if (debug)
-        {
-            fprintf (fp_stdout, "Adding: %s as cloud net ",
-                    inet_ntoa (cloud_net_list[i]));
-            fprintf (fp_stdout, "with mask %s (%u)\n", 
-                    inet_ntoa (cloud_net_mask2[i]),
-                    cloud_net_mask[i]);
-        }
-
-        tot_cloud_nets++;
-        i++;
-    }
-    return 1;
+    retval = ParseNetFile(fp,"cloud",MAX_CLOUD_HOSTS,
+			     cloud_net_list,cloud_net_mask2,
+			     cloud_net_mask,&tot_cloud_nets);
+   
+    fclose(fp);
+    
+    return retval;
 }
 
 int
 LoadCryptoNets (char *file) {
     FILE *fp;
-    char *line, *ip_string, *mask_string, *err;
-    int i, len;
-    long int mask_bits;
-    unsigned int full_local_mask;
-    char s[16];
-//    char *slash_p, *tmp;
+    int retval;
 
     fp = fopen(file, "r");
     if (!fp) {
@@ -3840,111 +3788,35 @@ LoadCryptoNets (char *file) {
         return 0;
     }
 
-    tot_crypto_nets = 0;
-    i = 0;
-    while (1) {
-        line = readline(fp, 1, 1);
-        if (!line)
-            break;
-
-        len = strlen(line);
-        if (line[len - 1] == '\n')
-            line[len - 1] = '\0';
-        ip_string = line;
-
-        if (i == MAX_CRYPTO_HOSTS) {
-            fprintf (fp_stderr, "Maximum number of crypto hosts/networks (%d) exceeded\n", MAX_CRYPTO_HOSTS);
-            return 0;
-        }
-
-        //single line format
-        if (strchr(ip_string,'/'))
-        {
-            ip_string = strtok(ip_string,"/");
-            mask_string = strtok(NULL,"/");
-
-            if (!mask_string) {
-                fprintf(fp_stderr, "Missing ip or network mask in crypto config n.%d\n", (i+1));
-                return 0;
-            }
-            if (!inet_aton (ip_string, &(crypto_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in crypto config n.%d\n", (i+1));
-                return 0;
-            }
-
-            //network mask as a single number
-            if (!strchr(mask_string,'.'))
-            { 
-                err = NULL;
-                mask_bits = strtol(mask_string, &err, 10);
-                if (*err || mask_bits < 1 || mask_bits > 32) {
-                    fprintf(fp_stderr, "Invalid network mask in crypto config n.%d\n", (i+1));
-                    return 0;
-                }
-
-                if (crypto_net_list[i].s_addr == 0)
-                   full_local_mask = 0;
-                else
-                   full_local_mask = 0xffffffff << (32 - mask_bits);
-
-                sprintf(s,"%d.%d.%d.%d",
-                    full_local_mask >> 24,
-                    (full_local_mask >> 16)  & 0x00ff,
-                    (full_local_mask >> 8 ) & 0x0000ff,
-                    full_local_mask & 0xff);
-                inet_aton (s, &(crypto_net_mask2[i]));
-                crypto_net_mask[i] = inet_addr(s);
-		crypto_net_list[i].s_addr &= crypto_net_mask[i];
-            }
-            //mask in dotted format
-            else
-            {
-                if (!inet_aton (mask_string, &(crypto_net_mask2[i]))) {
-                    fprintf(fp_stderr, "Invalid network mask in crypto config n.%d\n", (i+1));
-                    return 0;
-                }
-                crypto_net_mask[i] = inet_addr (mask_string);
-		crypto_net_list[i].s_addr &= crypto_net_mask[i];
-            }
-        }
-        //old format
-        else
-        {
-            if (!inet_aton (ip_string, &(crypto_net_list[i]))) {
-                fprintf(fp_stderr, "Invalid ip address in crypto config n.%d\n", (i+1));
-                return 0;
-            }
-
-            mask_string = readline(fp, 1, 1);
-            if (!mask_string){
-                fprintf(fp_stderr, "Missing network mask in crypto config n.%d\n", (i+1));
-                return 0;
-            }
-
-            len = strlen(mask_string);
-            if (mask_string[len - 1] == '\n')
-                mask_string[len - 1] = '\0';
-            if (!inet_aton (mask_string, &(crypto_net_mask2[i]))) {
-                fprintf(fp_stderr, "Invalid network mask in crypto config n.%d\n", (i+1));
-                return 0;
-            }
-            crypto_net_mask[i] = inet_addr (mask_string);
-            crypto_net_list[i].s_addr &= crypto_net_mask[i];
-        }
-       if (debug)
-        {
-            fprintf (fp_stdout, "Adding: %s as crypto net ",
-                    inet_ntoa (crypto_net_list[i]));
-            fprintf (fp_stdout, "with mask %s (%u)\n", 
-                    inet_ntoa (crypto_net_mask2[i]),
-                    crypto_net_mask[i]);
-        }
-
-        tot_crypto_nets++;
-        i++;
-    }
-    return 1;
+    retval = ParseNetFile(fp,"crypto",MAX_CRYPTO_HOSTS,
+			     crypto_net_list,crypto_net_mask2,
+			     crypto_net_mask,&tot_crypto_nets);
+   
+    fclose(fp);
+    
+    return retval;
 }
+
+int
+LoadWhiteNets (char *file) {
+    FILE *fp;
+    int retval;
+
+    fp = fopen(file, "r");
+    if (!fp) {
+        fprintf(fp_stderr, "Unable to open file '%s'\n", file);
+        return 0;
+    }
+
+    retval = ParseNetFile(fp,"whitelisted",MAX_WHITE_HOSTS,
+			     white_net_list,white_net_mask2,
+			     white_net_mask,&tot_white_nets);
+   
+    fclose(fp);
+    
+    return retval;
+}
+
 
 int 
 LoadInternalEth (char *file) {
@@ -4126,7 +3998,7 @@ cloud_ip (struct in_addr adx)
 Bool
 crypto_ip (struct in_addr adx)
 {
-  int i;
+  int i,j;
 
   //fprintf(fp_stdout, "Checking %s \n",inet_ntoa(adx));
   for (i = 0; i < tot_crypto_nets; i++)
@@ -4135,6 +4007,16 @@ crypto_ip (struct in_addr adx)
       if ((adx.s_addr & crypto_net_mask[i]) == crypto_net_list[i].s_addr)
 	{
 	  //fprintf(fp_stdout, "Crypto: %s\n",inet_ntoa(adx));
+          for (j = 0; j < tot_white_nets; j++)
+           {
+             //fprintf(fp_stdout, " Against: %s \n",inet_ntoa(cloud_net_list[i]));
+             if ((adx.s_addr & white_net_mask[j]) == white_net_list[j].s_addr)
+	      {
+	        //fprintf(fp_stdout, "Cloud: %s\n",inet_ntoa(adx));
+	        return 0;
+	      }
+           }
+           /* Is encrypted only if it */
 	  return 1;
 	}
     }

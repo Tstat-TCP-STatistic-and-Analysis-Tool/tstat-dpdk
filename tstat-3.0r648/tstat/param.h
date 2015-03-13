@@ -31,6 +31,7 @@
 #define MAX_INTERNAL_HOSTS  100
 #define MAX_CLOUD_HOSTS  100
 #define MAX_CRYPTO_HOSTS  40
+#define MAX_WHITE_HOSTS  100
 
 /*
 * maximum number of segment recorded for each quadrant of a flow;
@@ -78,7 +79,7 @@ Used only if WIPE_TCP_SINGLETON is defined
 //#define RUNTIME_MTIME_COUNTER 1
 
 /* Define the interval for garbage collection routin fire */
-#define GARBAGE_FIRE_TIME 5000    /* 5 ms */
+#define GARBAGE_FIRE_TIME 500      /* 0.5 ms */
 
 /* maximum number of concurrent TCP connection stored in the vector TTP 
 Increase this number on high speed network will help ...*/

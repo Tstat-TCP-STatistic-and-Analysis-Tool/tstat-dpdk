@@ -616,9 +616,12 @@ FindTTP (struct ip *pip, struct tcphdr *ptcp, int *pdir)
 #endif
 	  pthread_mutex_lock (&ttp_lock_mutex);
 	}
-      else
-	trace_done_periodic ();
+     else{
+        int i;
+	for (i=0; i< elapsed (last_cleaned, current_time) / GARBAGE_FIRE_TIME; i++ )
+		trace_done_periodic ();
 
+       }
       last_cleaned = current_time;
     }
 
@@ -1511,6 +1514,48 @@ trace_done (void)
   tcp_pair *ptp;
   int ix;
 
+
+  for (ix = 0; ix < MAX_TCP_PAIRS; ++ix)
+    {
+      ptp = ttp[ix];
+
+      if ((ptp == NULL))
+	continue;
+
+#ifdef WIPE_TCP_SINGLETONS
+      if (( (
+             (
+	      (ptp->c2s.syn_count>0 && ptp->s2c.syn_count==0)
+              ||
+	      (ptp->c2s.syn_count==0 && ptp->s2c.syn_count>0)
+	     ) 
+	     &&
+	     (
+	      ptp->packets == (ptp->c2s.syn_count+ptp->s2c.syn_count)
+	     )
+	    )
+            && 
+	    (elapsed (ptp->last_time, current_time) > TCP_SINGLETON_TIME)
+	  )
+	  ||
+          (elapsed (ptp->last_time, current_time) > TCP_IDLE_TIME))
+#else
+      if ((elapsed (ptp->last_time, current_time) > TCP_IDLE_TIME))
+#endif
+	{
+	  
+	  make_conn_stats (ptp, (ptp->s2c.syn_count > 0)
+			   && (ptp->c2s.syn_count > 0));
+
+	  tot_conn_TCP--;
+
+	  ttp[ix] = NULL;
+
+	}
+
+    }
+
+
   for (ix = 0; ix < MAX_TCP_PAIRS; ++ix)
     {
       ptp = ttp[ix];
@@ -1606,7 +1651,7 @@ trace_done_periodic ()
 		}
 	    }
 	  /* must be cleaned */
-	  tcp_cleaned++;
+	  //tcp_cleaned++;
 
 	  make_conn_stats (ptp, (ptp->s2c.syn_count > 0)
 			   && (ptp->c2s.syn_count > 0));
@@ -2775,6 +2820,9 @@ make_conn_stats (tcp_pair * ptp_save, Bool complete)
   FILE *fp;
   tcb *pab, *pba;
   u_long pab_expected, pba_expected;
+
+   /* Statistichs about CHAT flows */
+   tcp_cleaned ++;
 
   /* Statistichs about CHAT flows */
 #ifdef MSN_CLASSIFIER

@@ -40,6 +40,9 @@ char http_response[5];
 char http_range[HTTP_SMALL_BUFFER_SIZE];
 char http_server[HTTP_SMALL_BUFFER_SIZE];
 
+static char truncated_field[] = "[*]";
+static char full_field[] = "";
+
 extern FILE *fp_http_logc;
 extern u_int32_t http_full_url;
 
@@ -168,6 +171,9 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
      case HEAD:
        if (dir == C2S)
         { 
+          char *http_referer_tail=full_field;
+          char *http_url_tail=full_field;
+          char *http_ua_tail=full_field;
 
   	  last_payload_char =  *((char *)(pdata + data_length));
   	  *(char *)(pdata + data_length) = '\0';
@@ -201,6 +207,11 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
               memcpy(http_url,base+re_res[2].rm_so,
                (msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)));
                http_url[msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)]='\0';
+
+	       if (base+re_res[2].rm_eo>=(char *)plast)
+	        {
+		  http_url_tail = truncated_field;
+	        }
 	    }
           else
 	   {
@@ -228,6 +239,10 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
               memcpy(http_referer,base+re_res[1].rm_so,
                (msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)));
                http_referer[msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)]='\0';
+	       if (base+re_res[1].rm_eo>=(char*)plast)
+	        {
+		  http_referer_tail = truncated_field;
+	        }
 	    }
           else
 	   {
@@ -241,6 +256,10 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
               memcpy(http_ua,base+re_res[1].rm_so,
                (msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)));
                http_ua[msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)]='\0';
+	      if (base+re_res[1].rm_eo>=(char*)plast)
+	       {
+		 http_ua_tail = truncated_field;
+	       }
 	    }
           else
 	   {
@@ -264,6 +283,9 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 		{   
 	          strcpy(http_referer_private,"-");
 		}   
+                
+                http_referer_tail=full_field;
+	        http_url_tail=full_field;
 
 		break;
 	      case 1:
@@ -292,6 +314,9 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 		{   
 		  strcpy(http_referer_private,http_referer);
 		}   
+		
+                http_referer_tail=full_field;
+	        http_url_tail=full_field;
 
 		break;
 	      case 2:
@@ -301,6 +326,8 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 	      default:
 	        strcpy(http_url_private,"-");
 	        strcpy(http_referer_private,"-");
+                http_referer_tail=full_field;
+	        http_url_tail=full_field;
 		break;
 	   }
 
@@ -325,7 +352,7 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
   /*          wfprintf (fp_http_logc,"\t%d",seqnum-tcp_stats->syn-1); */
             wfprintf (fp_http_logc,"\t%s\t%s",http_method,http_host);
 
-            wfprintf (fp_http_logc,"\t%s\t%s\t%s",http_url_private,http_referer_private,http_ua);
+            wfprintf (fp_http_logc,"\t%s%s\t%s%s\t%s%s",http_url_private,http_url_tail,http_referer_private,http_referer_tail,http_ua,http_ua_tail);
 
             wfprintf (fp_http_logc,"\n");
 	  }
@@ -334,6 +361,8 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
      case HTTP:
        if (dir == S2C)
         { 
+	  char *http_url_tail=full_field;
+	  
           if ((*(char *)(pdata+4))!='/')
 	   {
 	     break;
@@ -346,6 +375,23 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 	    {
               memcpy(http_response,(char *) pdata+9,3);
 	      http_response[3]='\0';
+	      /* At lease one webserver (IdeaWebServer/v0.80) returns an invalid "0" response code
+	       producing an invalid http_response[] field.
+	       Let's do a sanity check, so that only digits are included
+	      */
+	      {
+		int idx;
+		for (idx = 0; idx<3 ; idx++)
+		 {
+		   if (!isdigit(http_response[idx]))
+		    {
+		      http_response[idx]='\0';
+		      break;
+		    }
+		 }
+		if (strlen(http_response)==0)
+                  strcpy(http_response,"-");
+	      }
             }
           else
 	    {
@@ -411,6 +457,11 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
               memcpy(http_url,base+re_res[1].rm_so,
                (msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)));
                http_url[msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)]='\0';
+	       if (base+re_res[1].rm_eo>=(char*)plast)
+	        {
+		  printf("Trunc Redirect\n");
+		  http_url_tail = truncated_field;
+	        }
 	    }
           else
 	   {
@@ -432,6 +483,8 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 		{
 		  strcpy(http_url_private,"-");
 		}
+		
+	        http_url_tail=full_field;
 		break;
 	      case 1:
 		if (regexec(&http_re[10],http_url,(size_t) 2,re_res,0)==0)
@@ -446,12 +499,15 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
 		{
 		  strcpy(http_url_private,http_url);
 		}
+		
+	        http_url_tail=full_field;
 		break;
 	      case 2:
 		strcpy(http_url_private,http_url);
 		break;
 	      default:
 		strcpy(http_url_private,"-");
+	        http_url_tail=full_field;
 		break;
 	   } 
 	  
@@ -475,7 +531,7 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
              wfprintf (fp_http_logc,"\t%f",time2double(current_time)/1e6);
      /*      wfprintf (fp_http_logc,"\t%d",seqnum-tcp_stats->syn-1); */
              wfprintf (fp_http_logc,"\t%s\t%s\t%s\t%s","HTTP",http_response,http_clen,http_ctype);
-             wfprintf (fp_http_logc,"\t%s\t%s\t%s",http_server,http_range,http_url_private);
+             wfprintf (fp_http_logc,"\t%s\t%s\t%s%s",http_server,http_range,http_url_private,http_url_tail);
 
              wfprintf (fp_http_logc,"\n");
 	   }

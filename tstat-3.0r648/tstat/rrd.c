@@ -130,8 +130,7 @@ rrdtool_init ()
   sc_par.sched_priority = 0;
   pthread_setschedparam(pthread_self(), SCHED_OTHER, &sc_par);
   setpriority(PRIO_PROCESS, 0, -20); */
-  syscall(SYS_ioprio_set,1, 0,  (2<< 13)| 0); 
-
+  //syscall(SYS_ioprio_set,1, 0,  (2<< 13)| 0); 
   pthread_create (&write_thread, NULL, (void *) &call_rrd_update, (void *) NULL);
 
 

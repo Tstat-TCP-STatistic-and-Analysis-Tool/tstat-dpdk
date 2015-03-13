@@ -991,7 +991,24 @@ tcpL7_flow_stat (struct ip *pip, void *pproto, int tproto, void *pdir,
 		  {
                     memcpy(ptp->http_response,(char *) pdata+9,3);
 		    ptp->http_response[3]='\0';
-                  }
+		    /* At lease one webserver (IdeaWebServer/v0.80) returns an invalid "0" response code
+		    producing an invalid http_response[] field.
+		    Let's do a sanity check, so that only digits are included
+		    */
+		    {
+		      int idx;
+		      for (idx = 0; idx<3 ; idx++)
+		      {
+			if (!isdigit(ptp->http_response[idx]))
+			  {
+			    ptp->http_response[idx]='\0';
+			    break;
+			  }
+		      }
+		      if (strlen(ptp->http_response)==0)
+                        strncpy(ptp->http_response,"000",4);
+		    }
+		  }
                 else
 		  {
                     strncpy(ptp->http_response,"000",4);

@@ -281,8 +281,12 @@ a new one */
 	  fprintf (fp_stdout, "\n\nlocked thread FLOW CLOSE\n");
 #endif
 	}
-      else
-	trace_done_periodic ();
+    else{
+        int i;
+	for (i=0; i< elapsed (last_cleaned, current_time) / GARBAGE_FIRE_TIME; i++ )
+		trace_done_periodic ();
+
+       }
       last_cleaned = current_time;
     }
 

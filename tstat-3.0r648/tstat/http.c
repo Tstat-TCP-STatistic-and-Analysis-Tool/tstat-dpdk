@@ -459,7 +459,6 @@ void http_flow_stat(struct ip *pip, void *pproto, int tproto, void *pdir,
                http_url[msize<(HTTP_LARGE_BUFFER_SIZE-1)?msize:(HTTP_LARGE_BUFFER_SIZE-1)]='\0';
 	       if (base+re_res[1].rm_eo>=(char*)plast)
 	        {
-		  printf("Trunc Redirect\n");
 		  http_url_tail = truncated_field;
 	        }
 	    }

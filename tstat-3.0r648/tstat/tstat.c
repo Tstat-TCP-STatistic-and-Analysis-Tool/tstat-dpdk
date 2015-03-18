@@ -1412,7 +1412,7 @@ create_new_outfiles (char *input_filename, Bool reuse_dir)
 {
   char tmpstr[FILENAME_SIZE+20];
   struct stat fbuf;
-  char date[100];
+  char date[1000];
   char * filename;
 
   if (input_filename==NULL)filename = old_filename;
@@ -1437,6 +1437,14 @@ create_new_outfiles (char *input_filename, Bool reuse_dir)
 	  sprintf(date, "mkdir -p %s", basenamedir);
 	  system(date);
           //mkdir (basenamedir, 0775);
+      }
+      else {
+             if (S_ISREG(fbuf.st_mode)){
+             	basenamedir = realloc (basenamedir, strlen (basenamedir + 5) );
+		strcat(basenamedir, ".out");
+	  	sprintf(date, "mkdir -p %s", basenamedir);
+	 	system(date);
+             }
       }
       strftime (date, 49, "%Y_%m_%d_%H_%M", localtime (&current_time.tv_sec));
       sprintf (basename, "%s/%s.out", basenamedir, date);

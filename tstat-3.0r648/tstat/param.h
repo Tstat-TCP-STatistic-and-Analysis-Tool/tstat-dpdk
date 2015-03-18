@@ -14,39 +14,39 @@
  * Tstat is deeply based on TCPTRACE. The authors would like to thank
  * Shawn Ostermann for the development of TCPTRACE.
  *
-*/
+ */
 
 
-/* Here you find the parameters which can be modified to tune Tstat
-   performance and/or histogram creation periods */
+/*  HERE YOU FIND THE PARAMETERS WHICH CAN BE MODIFIED TO TUNE TSTAT   */
+/*  PERFORMANCE AND/OR HISTOGRAM CREATION PERIODS                      */
 
 
-/* param dealing with the address hit counters */
+/* Params dealing with the address hit counters */
 #define MAX_ADX_SLOTS 70001	/* hash size for the ip addresses hit counter */
 #define ADDR_MASK 0x00ffffff	/* mask to count IP addresses - inet order */
 #define ADDR2_MASK 0x00ffffff	/* mask to count internal IP addresses bitrate - inet order */
 
 
-/* max number of ethernet MACs to check if the frame is incoming or outgoing */
+/* Max number of ethernet MACs to check if the frame is incoming or outgoing */
 #define MAX_INTERNAL_ETHERS  20
 
 
-/* max number of nets to check if ip is internal or external */
+/* Max number of nets to check if ip is internal or external */
 #define MAX_INTERNAL_HOSTS  100
 #define MAX_CLOUD_HOSTS  100
 #define MAX_CRYPTO_HOSTS  40
 #define MAX_WHITE_HOSTS  100
 
 
-/*maximum number of segment recorded for each quadrant of a flow;
+/*Maximum number of segment recorded for each quadrant of a flow;
 * setting this too small will affect the rexmit statistics, but leaving it
 * unlimited will pose a serious scalability problem, as the ordered list
 * of segments may grow too large, consuming too much memory and time when
 * looking for a segment. Probably should never be necessary to store more
 * than a number of segments larger than one hundred, since the
 * sliding window of TCP is usually much smaller than that (except if you
-* use TCP versions which allow very large windows ...)
-#define MAX_SEG_PER_QUAD -1  to track all segments */
+* use TCP versions which allow very large windows ...).
+  Use -1  to track all segments */
 #define MAX_SEG_PER_QUAD 10
 
 
@@ -71,6 +71,7 @@ no segments are observed for UDP_SINGLETON_TIME after the first segment
 Used only if WIPE_TCP_SINGLETON is defined*/
 #define UDP_SINGLETON_TIME 10000000   // 10s 
 
+
 /*  RUNTIME_CONFIG_IDLE * RUNTIME_MTIME_COUNTER = amount of time to wait before re-load 'runtime.conf'  */
 #define RUNTIME_CONFIG_IDLE   21      // amount of time between to check of 'runtime.conf'
 #define RUNTIME_MTIME_COUNTER 3       // no. of consecutive times 'runtime.conf' is found unchanged before re-load the file
@@ -82,15 +83,17 @@ Used only if WIPE_TCP_SINGLETON is defined*/
 
 /* Define granularity of garbage collection splitting. 
  The flow table is not scanned in one time,
- but the workload is done in GARBAGE_SPLIT_RATIO times */
+ but the workload is done in GARBAGE_SPLIT_RATIO times
+ IMPORTANT: it must be a divisor of GARBAGE_PERIOD,
+ MAX_TCP_PAIRS and MAX_UDP_PAIRS  */
 #define GARBAGE_SPLIT_RATIO 10000
 
 
-/* Define the interval for garbage collection routine to fire */
+/* Define the interval for garbage collection routine to be fired */
 #define GARBAGE_FIRE_TIME (GARBAGE_PERIOD / GARBAGE_SPLIT_RATIO )  
 
 
-/* maximum number of concurrent TCP connections stored in the vector TTP 
+/* Maximum number of concurrent TCP connections stored in the vector TTP 
 Increase this number on high speed network will help ...*/
 #define MAX_TCP_PAIRS 1800000
 
@@ -99,16 +102,16 @@ Increase this number on high speed network will help ...*/
 #define MAX_TCP_PAIRS_BURST (MAX_TCP_PAIRS / GARBAGE_SPLIT_RATIO)
 
 
-/* maximum number of concurrent UDP connections stored in the vector UTP 
+/* Maximum number of concurrent UDP connections stored in the vector UTP 
 Increase this number on high speed network will help ...*/
-#define MAX_UDP_PAIRS (MAX_UDP_PAIRS / GARBAGE_SPLIT_RATIO)
+#define MAX_UDP_PAIRS 3600000
 
 
 /* Each time the garbage collection is fired, it scans MAX_UDP_PAIRS_BURST upd flows */
-#define MAX_UDP_PAIRS_BURST 360
+#define MAX_UDP_PAIRS_BURST (MAX_UDP_PAIRS / GARBAGE_SPLIT_RATIO)
 
 
-/* max depth of the linear serch in the previous vector... */
+/* Max depth of the linear serch in the previous vectors... */
 #define LIST_SEARCH_DEPT 200
 
 

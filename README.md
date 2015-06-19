@@ -34,7 +34,7 @@ Tstat-DPDK consists of two components currently available at the [official SVN r
 The repository contains
 
 * a performance enhanced Tstat version (currently available under the `/tstat-3.0r648`)
-* a DPDK cluster (currently available under `/one_copy_cluster_dpdk`)
+* a DPDK cluster (currently available under `/one_copy_cluster`)
 
 Essentially, the DPDK cluster acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
 
@@ -50,7 +50,7 @@ However, notice that this guide is not meant to be a fine grained tutorial about
 A few general dependences are required before to start
 
 * Intel DPDK requires  **Intel 82599 based network interfaces**
-* A Debian based Linux distribution with kernel >= 2.6.3
+* A Debian based Linux distribution with kernel >= 3.14
 * Linux kernel headers: to install run
 ```bash
     sudo apt-get install linux-headers-$(uname -r)
@@ -62,14 +62,14 @@ A few general dependences are required before to start
 
 ## 2.1 <a name="inst-dpdk"></a>Installing Intel DPDK
 
-We highly recommend to use **Install DPDK v1.7.1**. With other versions it is **NOT** guaranted to work properly.
+We highly recommend to use **Install DPDK v1.8.0**. With other versions it is **NOT** guaranted to work properly.
 
 Software Dependences: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libstdc++.i686, glibc-devel.i686, python`
 
 ```bash
-	wget http://dpdk.org/browse/dpdk/snapshot/dpdk-1.7.1.tar.gz
-	tar xzf dpdk-1.7.1.tar.gz
-	cd dpdk-1.7.1
+	wget http://dpdk.org/browse/dpdk/snapshot/dpdk-1.8.0.tar.gz
+	tar xzf dpdk-1.8.0.tar.gz
+	cd dpdk-1.8.0
 	export RTE_SDK=$(pwd)
 	export RTE_TARGET=x86_64-native-linuxapp-gcc
 	make install T=$RTE_TARGET
@@ -205,8 +205,6 @@ For more information please refer to the [Tstat HOWTO](http://tstat.tlc.polito.i
 
 # 4. <a name="run"></a>Run Tstat-DPDK
 
-The `$TSTATDPDK/one_copy_cluster_dpdk/scripts` provide useful scripts to starts and stop the data processing.
-
 **Note:** if, when running Tstat-DPDK, you encounter an error like this
 ```
     error while loading shared libraries: libtstat.so.0: cannot open shared object file: No such file or directory
@@ -220,14 +218,21 @@ run this command to make the enviroment to find `libstat` shared object:
 
 ## 4.1 <a name="start"></a>Start Tstat Instances
 
-First of all, you need to decide how many Tstat instances you want to run in parallel. `$TSTATDPDK/one_copy_cluster_dpdk/scripts` provides 3 quick scripts to lauch 1, 2 or 4 Tstat instances. For instance
+First of all, you need to decide how many Tstat instances you want to run in parallel. 
 
 If you want to start 2 instances, type:
 ```bash
-	sudo $TSTATDPDK/one_copy_cluster_dpdk/scripts/start_2_instances.sh
+	sudo $TSTATDPDK/one_copy_cluster_dpdk/build/tstat_dpdk -c 1 -n 4 -- -m 2
 ```
 execute Tstat-DPDK splitting the traffic among 2 separate Tstat processes.
-All processes run in background (i.e., detached from the shell).
+
+It might be useful to run this command detached from the shell (ending it with `&`).
+
+**Command line options**
+
+`-m` option controls the **number of pararallel instances**.
+
+`-c` and `-n` are DPDK-related. **Do not change them.**
 
 Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing, number of TCP and UDP flows closed, 
 incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
@@ -240,12 +245,8 @@ Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 R
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 
-To stop Tstat-DPDK, run:
-```bash
-	sudo $TSTATDPDK/one_copy_cluster_dpdk/scripts/quit_instances.sh
-```
 
-The system will quit and it will print overall statistics on its working divided by network interface and by instance.
+The system when quitting prints overall statistics on its working divided by network interface and by instance.
 The output has this form.
 ```
 PORT: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
@@ -271,7 +272,7 @@ Time elapsed: 2879.215s
 ```
 ## 4.3 <a name="logs"></a>Log Files Directory
 Tstat produces several log files for different events seen on the network.
-Log files are keep separated for each instance and they are put in `one_copy_cluster_dpdk/tstatXX.log.out` where `XX` is the number of Tstat instance.
+Log files are keep separated for each instance and they are put in `one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
 The name of these directories is hardcoded in the software and cannot be modified.
 
 On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (recall that each instance must have its different database in different directories).
@@ -279,4 +280,9 @@ On the contrary, RRD database directory is specified in the configuration files 
 ## 4.4 <a name="logs-perf"></a>System Performance Logs
 In the directory `$TSTATDPDK/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
-There are 3 columns which are respectively the mean, the max and the standard deviation of the per packet processing time.
+
+These kind of output can be disabled by commenting the 5th line of `src/main_scheduler_multi_pool_auto_start.c` to be like this:
+
+`#define DEBUG`
+
+

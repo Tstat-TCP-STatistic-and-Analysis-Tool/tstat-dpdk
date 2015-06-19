@@ -11,13 +11,15 @@ LDLIBS = -ltstat -lpcap -lpthread -lm
 #LDFLAGS = -Wl,--rpath -Wl,/usr/local/lib
 
 # binary name
-APP = cluster_dpdk
+APP = tstat_dpdk
 
 # all source are stored in SRCS-y
-SRCS-y := src/main_copy.c
+SRCS-y := src/main_scheduler_multi_pool_auto_start.c
+#SRCS-y := src/main_copy.c
 
 CFLAGS += -O3
-CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -g
+#CFLAGS += $(WERROR_FLAGS)
 
 include $(RTE_SDK)/mk/rte.extapp.mk
 

@@ -5,11 +5,14 @@
 #include <string.h>
 #include <stdint.h>
 #include <signal.h>
-#include <unistd.h>
 #include <errno.h>
+#include <libgen.h>
 #include <sys/queue.h>
 #include <sys/syscall.h>
 #include <math.h>
+#include <sched.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -27,6 +30,7 @@
 #include <rte_pci.h>
 #include <rte_debug.h>
 #include <rte_ether.h>
+#include <rte_ip.h>
 #include <rte_ethdev.h>
 #include <rte_ring.h>
 #include <rte_log.h>
@@ -35,6 +39,7 @@
 #include <rte_string_fns.h>
 #include <rte_cycles.h>
 #include <rte_atomic.h>
+#include <rte_version.h>
 
 /* Useful macro for error handling */
 #define FATAL_ERROR(fmt, args...)       rte_exit(EXIT_FAILURE, fmt "\n", ##args)
@@ -59,6 +64,12 @@ uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
+};
+uint8_t rss_seed_alternative [] = {	0x6d, 0x5a, 0x6d, 0x5b, 0x6d, 0x5a, 0x6d, 0x5b,
+					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
 };
 
 /* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
@@ -103,7 +114,7 @@ static const struct rte_eth_rxconf rx_conf = {
 		.hthresh = 8,   /* Ring host threshold */
 		.wthresh = 4,   /* Ring writeback threshold */
 	},
-	.rx_free_thresh = 0,    /* Immediately free RX descriptors */
+	.rx_free_thresh = 32,    /* Immediately free RX descriptors */
 };
 
 /* Struct for configuring each tx queue. These are default values */

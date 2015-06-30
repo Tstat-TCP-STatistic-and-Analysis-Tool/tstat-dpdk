@@ -23,7 +23,7 @@ Tstat-DPDK Quick Start Guide
 
 # 1. <a name="intro"></a> Introduction
 
-This document reports a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit (DPDK) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
+This document is a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit ([DPDK](http://dpdk.org/)) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
 
 Tstat-DPDK consists of two components currently available at the [official SVN repository](http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/)
 
@@ -39,7 +39,7 @@ The repository contains
 Essentially, the DPDK cluster acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
 
 Here below we provide a step by step guide to setup the overall system.
-However, notice that this guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
+This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
 
 * official [Tstat Howto](http://tstat.polito.it/HOWTO.shtml)
 * official Intel [DPDK website](http://dpdk.org/doc) and [quick start](http://dpdk.org/doc/quick-start)
@@ -47,24 +47,24 @@ However, notice that this guide is not meant to be a fine grained tutorial about
 
 # 2. <a name="inst"></a>Installation
 
-A few general dependences are required before to start
+A few general dependencies are required before to start
 
 * Intel DPDK requires  **Intel 82599 based network interfaces**
-* A Debian based Linux distribution with kernel >= 3.14
+* A Linux distribution with kernel >= 3.14 (we tested it on Debian)
 * Linux kernel headers: to install run
 ```bash
     sudo apt-get install linux-headers-$(uname -r)
 ```
 
-* Several package needed before installing this software:
+* Several packages needed before installing this software:
 
+  * DPDK needs: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libstdc++.i686, glibc-devel.i686, python`
+  * Tstat needs: `libpcap-dev, rrdtool, librrd-dev, cpufrequtils, autoconf, libtool`
 
 
 ## 2.1 <a name="inst-dpdk"></a>Installing Intel DPDK
 
 We highly recommend to use **Install DPDK v1.8.0**. With other versions it is **NOT** guaranted to work properly.
-
-Software Dependences: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libstdc++.i686, glibc-devel.i686, python`
 
 ```bash
 	wget http://dpdk.org/browse/dpdk/snapshot/dpdk-1.8.0.tar.gz
@@ -78,17 +78,15 @@ Software Dependences: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libs
 
 **NOTES:** 
 
-* `RTE_SDK` and `RTE_TARGET` are two environment variable used by DPDK to handle DPDK applications. These variables have to point respectively to DPDK installation directory and compilation target.
+* `RTE_SDK` and `RTE_TARGET` are two environment variables used by DPDK to handle DPDK applications. These variables have to point respectively to DPDK installation directory and compilation target.
 * if you are running on a i686 machine, please use `i686-native-linuxapp-gcc` as `RTE_TARGET`
-* For documentation we refer the reader to the [official documenation](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf)
+* For more information we refer the reader to the [official documentation](http://dpdk.org/doc/guides-1.8/linux_gsg/index.html)
 
 
 
 ## 2.2 <a name="inst-tstat-dpdk"></a> Installing Tstat DPDK
 
-Software dependences: `libpcap-dev, rrdtool, librrd-dev, autoconf, libtool, cpufrequtils`
-
-This step require to compile both the DPDK Tstat flavour and the DPDK cluster application. They are both available under the root folder of the SVN repository
+This step requires to compile both the DPDK Tstat flavour and the DPDK cluster application. They are both available under the root folder of the SVN repository
 
 
 ```bash
@@ -107,7 +105,7 @@ As previously pointed out, the DPDK cluster acts as a load balancer in the overa
 	sudo make install
 ```
 
-***Note:*** `configure` should prompt the following message is the set up is correct
+***Note:*** `configure` should print the following message is the set up is correct.
 ```
 [...]
 -------------------------------------------------
@@ -126,19 +124,17 @@ As previously pointed out, the DPDK cluster acts as a load balancer in the overa
 This indicates both `libpcap` and `rrdtool` libraries have been correctly found and Tstat will be compiled as a library.
 
 ## 2.2.2 <a name="comp-dpdk-cluster"></a>Compiling the DPDK cluster
-
 ```bach
 	cd $TSTATDPDK/one_copy_cluster_dpdk
-	make clean
-    make
+	make
 ```
 
 # 3. <a name="conf"></a>System Configuration
 
 Before running Tstat-DPDK there are few things to do.
 
-**Note:** To simplity the setup, the steps 3.1, 3.2 and 3.3 can be automatically performed using the script `one_copy_cluster_dpdk/scripts/configure_machine.sh`.
-Please verify that script is doing the right operation for your system.
+**Note:** To simplity the setup, all the steps can be automatically performed using the script `$TSTATDPDK/one_copy_cluster_dpdk/scripts/configure_machine.sh`.
+Please verify that the script is doing the right operation for your system.
 
 ## 3.1 <a name="conf-hugepage"></a>Reserve a large number of hugepages to DPDK
 
@@ -154,14 +150,14 @@ For instance, for a 8 core system this would result in `4096 hugepages`, i.e., 8
 
 ## 3.2 <a name="conf-cpu"></a>Force CPUs clock to remain high
 
-To achieve the best performance, your CPU must run always at the highest speed. You need to have installed `cpufrequtils` package.
+To achieve the best performance, your CPU must always run at the highest speed. You need to have installed `cpufrequtils` package.
 
 ```bash
 	sudo cpufreq-set -r -g performance
 ```
 
 ## 3.3 <a name="alsr"></a>Disable Address Layout Space Randomization
-Address Layout Space Randomization (ALSR) is a useful feature of Linux systems. Unfortunaley sometimes it makes DPDK application not to start.
+Address Layout Space Randomization (ALSR) is a feature of Linux systems, that unfortunately sometimes makes DPDK application not to start properly (more info [here](http://dpdk.org/doc/guides-1.8/prog_guide/multi_proc_support.html#multi-process-limitations)).
 So we suggest to disable it by means of this command:
 ```bash
 	sudo bash -c "echo 0 > /proc/sys/kernel/randomize_va_space"
@@ -169,7 +165,7 @@ So we suggest to disable it by means of this command:
 
 ## 3.4 <a name="conf-nics"></a> Bind NICs to DPDK driver
 
-In able to use the DPDK framework on a NIC we need to change the driver associated to the network card. The driver is located within the `kmod` folder of the DPDK version compiled (recall the configuration of the `RTE_SDK` and `RTE_TARGET` used at compile time).
+In order to use the DPDK framework on a NIC we need to change the driver associated to the network card. The driver is located within the `kmod` folder of the DPDK version compiled (recall the configuration of the `RTE_SDK` and `RTE_TARGET` used at compile time).
 
 The following command enable DPDK drivers for all DPDK-supported NICs
 
@@ -195,11 +191,11 @@ Network devices using kernel driver
 ```
 **NOTE:** If for any reason you don't want to bind all the DPDK-supported interfaces to DPDK enviroment, use the `dpdk_nic_bind.py` as described in the [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
-## 3.5  <a name="conf-libtstat"></a>Set up Tstat configurations
+## 3.5  <a name="conf-libtstat"></a>Set up Tstat configuration
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
-For instance, in `one_copy_cluster_dpdk/tstat-conf` are provided a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which includes all Tstat plugins, RRDTool output stats and CryptoPAn IP addresses anonymization for log files. Fell free to configure the software as you like.
+For instance, in `one_copy_cluster_dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which include all Tstat plugins, RRDTool output stats and CryptoPAn IP addresses anonymization for log files. Fell free to configure the software as you like.
 For more information please refer to the [Tstat HOWTO](http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library)
 
 
@@ -209,22 +205,22 @@ For more information please refer to the [Tstat HOWTO](http://tstat.tlc.polito.i
 ```
     error while loading shared libraries: libtstat.so.0: cannot open shared object file: No such file or directory
 ```
-run this command to make the enviroment to find `libstat` shared object:
+make sure the environment  finds `libtstat`  shared object by running:
 ```bash
     export LD_LIBRARY_PATH=/usr/local/lib
 ```
 
 
 
-## 4.1 <a name="start"></a>Start Tstat Instances
+## 4.1 <a name="start"></a>Start Tstat instances
 
-First of all, you need to decide how many Tstat instances you want to run in parallel. 
+First of all, you need to decide how many Tstat instances you want to run in parallel. You cannot set up more instances than available cores.
 
 If you want to start 2 instances, type:
 ```bash
 	sudo $TSTATDPDK/one_copy_cluster_dpdk/build/tstat_dpdk -c 1 -n 4 -- -m 2
 ```
-execute Tstat-DPDK splitting the traffic among 2 separate Tstat processes.
+This executes Tstat-DPDK splitting the traffic among 2 separate Tstat processes.
 
 It might be useful to run this command detached from the shell (ending it with `&`).
 
@@ -234,8 +230,7 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-c` and `-n` are DPDK-related. **Do not change them.**
 
-Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing, number of TCP and UDP flows closed, 
-incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
+Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
 
 Below you have an example of this output
 ```
@@ -246,7 +241,7 @@ Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 R
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 
 
-The system when quitting prints overall statistics on its working divided by network interface and by instance.
+When quitting, the system prints overall statistics on its working divided by network interface and by instance.
 The output has this form.
 ```
 PORT: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
@@ -272,7 +267,7 @@ Time elapsed: 2879.215s
 ```
 ## 4.3 <a name="logs"></a>Log Files Directory
 Tstat produces several log files for different events seen on the network.
-Log files are keep separated for each instance and they are put in `one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
+Log files are kept separated for each instance and they are put in `$TSTATDPDK/one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
 The name of these directories is hardcoded in the software and cannot be modified.
 
 On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (recall that each instance must have its different database in different directories).
@@ -281,8 +276,6 @@ On the contrary, RRD database directory is specified in the configuration files 
 In the directory `$TSTATDPDK/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
 
-These kind of output can be disabled by commenting the 5th line of `src/main_scheduler_multi_pool_auto_start.c` to be like this:
-
-`#define DEBUG`
+This kind of output can be disabled by editing the source code -- 5th line of `src/main_scheduler_multi_pool_auto_start.c` and commenting the `#define DEBUG` statement.
 
 

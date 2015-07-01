@@ -17,7 +17,7 @@
 #define CPU_SET_NAME "tstat-dpdk00"
 
 #define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
-#define MEMPOOL_ELEM_NB (524288*2-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
+#define MEMPOOL_ELEM_NB (524288-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
 #define MEMPOOL_ELEM_SZ 2048  					// Power of two greater than 1500
 #define MEMPOOL_CACHE_SZ 0  					// MUST BE 0 WITH SCHED_DEADLINE, otherwise the driver wil crash !!
 #define MAX_QUEUES 16

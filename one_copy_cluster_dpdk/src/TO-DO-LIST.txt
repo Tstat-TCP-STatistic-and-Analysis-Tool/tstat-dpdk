@@ -1,0 +1,9 @@
+Middle term work:
+1. Ability of the cluster of discerning internal or external traffic by means of MAC address
+2. Ability of detecting non-IP or non-ETH packets (VLAN, MPLS...)
+3. Customize load-balancing rules.
+4. Changeable log files directories
+5. Check full compatibility with Tstat 3.0 (RRD, directories, constants, DNHunter)
+
+Martnio Trevisan,
+1/7/2015

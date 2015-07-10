@@ -5,8 +5,8 @@ Tstat-DPDK Quick Start Guide
 * [2. Installation](#inst)
     * [2.1 Installing Intel DPDK](#inst-dpdk)
     * [2.2 Installing Tstat DPDK](#inst-tstat-dpdk)
-        * [2.2.1 Compiling LibTstat](#comp-libtstat)
-        * [2.2.2 Compiling DPDK Cluster](#comp-dpdk-cluster)
+        * [2.2.1 Installing last version of Tstat](#comp-libtstat)
+        * [2.2.2 Installing the DPDK Load Balancer](#comp-dpdk-cluster)
 * [3. System Comfiguration](#conf)
     * [3.1 Reserve a large number of hugepages to DPDK](#conf-hugepage)
     * [3.2 Force CPUs clock to remain high](#conf-cpu)
@@ -18,6 +18,7 @@ Tstat-DPDK Quick Start Guide
     * [4.2 Stop Tstat Instances](#stop)
     * [4.3 Log Files Directory](#logs)
     * [4.4 System Performance Logs](#logs-perf)
+    * [4.5 Advanced load balancing](#load-balance)
 
 
 
@@ -25,18 +26,13 @@ Tstat-DPDK Quick Start Guide
 
 This document is a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit ([DPDK](http://dpdk.org/)) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
 
-Tstat-DPDK consists of two components currently available at the [official SVN repository](http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/)
+Tstat-DPDK consists of in a DPDK wrapper available [official SVN repository](http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/)
 
 ```bash
     svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/
 ```
 
-The repository contains
-
-* a performance enhanced Tstat version (currently available under the `/tstat-3.0r648`)
-* a DPDK cluster (currently available under `/one_copy_cluster`)
-
-Essentially, the DPDK cluster acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
+Essentially, the DPDK wrapper acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
 
 Here below we provide a step by step guide to setup the overall system.
 This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
@@ -84,21 +80,19 @@ We highly recommend to use **Install DPDK v1.8.0**. With other versions it is **
 
 
 
-## 2.2 <a name="inst-tstat-dpdk"></a> Installing Tstat DPDK
+## 2.2 <a name="inst-tstat-dpdk"></a>Installing Tstat DPDK
 
-This step requires to compile both the DPDK Tstat flavour and the DPDK cluster application. They are both available under the root folder of the SVN repository
-
-
-```bash
-	svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/
-```    
+This step requires to compile both Tstat and the DPDK cluster application. They are both available under Tstat SVN repository.   
 
 As previously pointed out, the DPDK cluster acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with `$TSTATDPDK`.
 
-## 2.2.1 <a name="comp-libtstat"></a>Compiling LibTstat
+## 2.2.1 <a name="comp-libtstat"></a>Installing last version of Tstat
+
+In this step you need to download and install the latest Tstat version from the official SVN repository, compile it, and install `libtstat`
 
 ```bash
-	cd $TSTATDPDK/tstat-3.0r648
+	svn co http://tstat.polito.it/svn/software/tstat/trunk/
+	cd $TSTATDPDK/trunk
 	./autogen.sh
 	./configure --enable-libtstat
 	make
@@ -123,9 +117,10 @@ As previously pointed out, the DPDK cluster acts as a load balancer in the overa
 ```
 This indicates both `libpcap` and `rrdtool` libraries have been correctly found and Tstat will be compiled as a library.
 
-## 2.2.2 <a name="comp-dpdk-cluster"></a>Compiling the DPDK cluster
-```bach
-	cd $TSTATDPDK/one_copy_cluster_dpdk
+## 2.2.2 <a name="comp-dpdk-cluster"></a>Installing the DPDK Load Balancer
+```bash
+	svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk 
+	cd $TSTATDPDK/tstat-dpdk
 	make
 ```
 
@@ -218,7 +213,7 @@ First of all, you need to decide how many Tstat instances you want to run in par
 
 If you want to start 2 instances, type:
 ```bash
-	sudo $TSTATDPDK/one_copy_cluster_dpdk/build/tstat_dpdk -c 1 -n 4 -- -m 2
+	sudo $TSTATDPDK/tstat-dpdk/build/tstat_dpdk -c 1 -n 4 -- -m 2
 ```
 This executes Tstat-DPDK splitting the traffic among 2 separate Tstat processes.
 
@@ -228,7 +223,7 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-m` option controls the **number of pararallel instances**.
 
-`-c` and `-n` are DPDK-related. **Do not change them.**
+`-c` and `-n` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
 Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
 
@@ -268,9 +263,9 @@ Time elapsed: 2879.215s
 ## 4.3 <a name="logs"></a>Log Files Directory
 Tstat produces several log files for different events seen on the network.
 Log files are kept separated for each instance and they are put in `$TSTATDPDK/one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
-The name of these directories is hardcoded in the software and cannot be modified.
+If you want to ovverride this setting you can use the `-s <logdir>` option in the Tstat configuration files.
 
-On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (recall that each instance must have its different database in different directories).
+RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the `-r <rrd_dir>` option (recall that each instance must have its different database in different directories).
 
 ## 4.4 <a name="logs-perf"></a>System Performance Logs
 In the directory `$TSTATDPDK/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
@@ -278,4 +273,39 @@ Each instance writes in its own file (the `XX` in the name of the file is its nu
 
 This kind of output can be disabled by editing the source code -- 5th line of `src/main_scheduler_multi_pool_auto_start.c` and commenting the `#define DEBUG` statement.
 
+## 4.5 <a name="load-balance"></a>Advanced load balancing
+It is possible to configure the load balancing rule to optimize particular network setups.
 
+The default load balancing rule ensures that packets belonging to the same flow will be processed by the same Tstat instance.
+In this way Tstat can produce per-flow consistent statistics.
+Nevertheless the same client or server can appear in different Tstat instances in different TCP/UDP connections.
+
+If you set up Tstat in the outgoing link of local network, you can setup an advanced load balancing rule.
+Since it might be useful to have the traffic of the same local network host to appear always in the same Tstat instance, you can configure load balancing as follows:
+
+* The interface sniffing the traffic from the **outgoing link** loadbalances the traffic according to **source IP** address.
+* The interface sniffing the traffic from the **incoming link** loadbalances the traffic according to **destination IP** address.
+
+To perform this action you have to modify few lines in the source code and then recompile as follows:
+
+* In `$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c` file, find these lines
+
+```
+	/* Use the next 2 variables to set up port direction */
+	static struct port_dir port_directions [] = {};
+	static uint8_t nb_port_directions = 0;
+```
+* Modify them to respect your network configuration, like in this example:
+
+```
+	/* Use the next 2 variables to set up port direction */
+	static struct port_dir port_directions [] = {
+		{ .pci_address = "01:00.0", .is_out=0 },
+		{ .pci_address = "01:00.1", .is_out=1 },
+	};
+	static uint8_t nb_port_directions = 2;
+```
+
+Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
+
+* Recompile the loadbalancer just typing `make` in `$TSTATDPDK/tstat-dpdk/` folder.

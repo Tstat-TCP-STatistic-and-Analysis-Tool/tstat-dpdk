@@ -633,7 +633,12 @@
         padding: 30px;
     }
 </style>
+
 <body class="markdown-body">
+
+<!--  *************************************** PUT HERE THE RAW HTML CODE *************************************** -->
+
+
 <h1 id="tstat-dpdk-quick-start-guide">Tstat-DPDK Quick Start Guide</h1>
 
 <ul>
@@ -641,8 +646,8 @@
 <li><a href="#inst">2. Installation</a> <br>
 <ul><li><a href="#inst-dpdk">2.1 Installing Intel DPDK</a></li>
 <li><a href="#inst-tstat-dpdk">2.2 Installing Tstat DPDK</a> <br>
-<ul><li><a href="#comp-libtstat">2.2.1 Compiling LibTstat</a></li>
-<li><a href="#comp-dpdk-cluster">2.2.2 Compiling DPDK Cluster</a></li></ul></li></ul></li>
+<ul><li><a href="#comp-libtstat">2.2.1 Installing last version of Tstat</a></li>
+<li><a href="#comp-dpdk-cluster">2.2.2 Installing the DPDK Load Balancer</a></li></ul></li></ul></li>
 <li><a href="#conf">3. System Comfiguration</a> <br>
 <ul><li><a href="#conf-hugepage">3.1 Reserve a large number of hugepages to DPDK</a></li>
 <li><a href="#conf-cpu">3.2 Force CPUs clock to remain high</a></li>
@@ -653,7 +658,8 @@
 <ul><li><a href="#start">4.1 Start Tstat Instances</a></li>
 <li><a href="#stop">4.2 Stop Tstat Instances</a></li>
 <li><a href="#logs">4.3 Log Files Directory</a></li>
-<li><a href="#logs-perf">4.4 System Performance Logs</a></li></ul></li>
+<li><a href="#logs-perf">4.4 System Performance Logs</a></li>
+<li><a href="#load-balance">4.5 Advanced load balancing</a></li></ul></li>
 </ul>
 
 
@@ -662,18 +668,13 @@
 
 <p>This document is a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit (<a href="http://dpdk.org/">DPDK</a>) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.</p>
 
-<p>Tstat-DPDK consists of two components currently available at the <a href="http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/">official SVN repository</a></p>
+<p>Tstat-DPDK consists of in a DPDK wrapper available <a href="http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/">official SVN repository</a></p>
+
+
 
 <pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/</code></pre>
 
-<p>The repository contains</p>
-
-<ul>
-<li>a performance enhanced Tstat version (currently available under the <code>/tstat-3.0r648</code>)</li>
-<li>a DPDK cluster (currently available under <code>/one_copy_cluster</code>)</li>
-</ul>
-
-<p>Essentially, the DPDK cluster acts as <strong>load balancer</strong>, reading the aggregate traffic and dispatching packets to different <strong>Tstat instances</strong>, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.</p>
+<p>Essentially, the DPDK wrapper acts as <strong>load balancer</strong>, reading the aggregate traffic and dispatching packets to different <strong>Tstat instances</strong>, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.</p>
 
 <p>Here below we provide a step by step guide to setup the overall system. <br>
 This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to</p>
@@ -683,6 +684,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 <li>official Intel <a href="http://dpdk.org/doc">DPDK website</a> and <a href="http://dpdk.org/doc/quick-start">quick start</a></li>
 <li>For information about this Readme file and Tstat-DPDK please write to <a href="mailto:martino.trevisan@studenti.polito.it">martino.trevisan@studenti.polito.it</a> or the offical <a href="mailto:tstat@tlc.polito.it">Tstat mailing list</a></li>
 </ul>
+
+
 
 <h1 id="2-installation">2. <a></a>Installation</h1>
 
@@ -694,6 +697,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 <li>Linux kernel headers: to install run</li>
 </ul>
 
+
+
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> apt-get install linux-headers-$(uname -r)</code></pre>
 
 <ul>
@@ -703,9 +708,13 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 <li>Tstat needs: <code>libpcap-dev, rrdtool, librrd-dev, cpufrequtils, autoconf, libtool</code></li></ul></li>
 </ul>
 
+
+
 <h2 id="21-installing-intel-dpdk">2.1 <a></a>Installing Intel DPDK</h2>
 
 <p>We highly recommend to use <strong>Install DPDK v1.8.0</strong>. With other versions it is <strong>NOT</strong> guaranted to work properly.</p>
+
+
 
 <pre class="prettyprint"><code class="language-bash hljs ">    wget http://dpdk.org/browse/dpdk/snapshot/dpdk-<span class="hljs-number">1.8</span>.<span class="hljs-number">0</span>.tar.gz
     tar xzf dpdk-<span class="hljs-number">1.8</span>.<span class="hljs-number">0</span>.tar.gz
@@ -723,27 +732,32 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 <li>For more information we refer the reader to the <a href="http://dpdk.org/doc/guides-1.8/linux_gsg/index.html">official documentation</a></li>
 </ul>
 
-<h2 id="22-installing-tstat-dpdk">2.2 <a></a> Installing Tstat DPDK</h2>
 
-<p>This step requires to compile both the DPDK Tstat flavour and the DPDK cluster application. They are both available under the root folder of the SVN repository</p>
 
-<pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/</code></pre>
+<h2 id="22-installing-tstat-dpdk">2.2 <a></a>Installing Tstat DPDK</h2>
+
+<p>This step requires to compile both Tstat and the DPDK cluster application. They are both available under Tstat SVN repository.   </p>
 
 <p>As previously pointed out, the DPDK cluster acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with <code>$TSTATDPDK</code>.</p>
 
 
 
-<h2 id="221-compiling-libtstat">2.2.1 <a></a>Compiling LibTstat</h2>
+<h2 id="221-installing-last-version-of-tstat">2.2.1 <a></a>Installing last version of Tstat</h2>
+
+<p>In this step you need to download and install the latest Tstat version from the official SVN repository, compile it, and install <code>libtstat</code></p>
 
 
 
-<pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/tstat-<span class="hljs-number">3.0</span>r648
+<pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/trunk/
+    <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/trunk
     ./autogen.sh
     ./configure --enable-libtstat
     make
     <span class="hljs-built_in">sudo</span> make install</code></pre>
 
 <p><strong><em>Note:</em></strong> <code>configure</code> should print the following message is the set up is correct.</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs haml">[...]
 -<span class="ruby">------------------------------------------------
@@ -763,10 +777,15 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 
 
-<h2 id="222-compiling-the-dpdk-cluster">2.2.2 <a></a>Compiling the DPDK cluster</h2>
+<h2 id="222-installing-the-dpdk-load-balancer">2.2.2 <a></a>Installing the DPDK Load Balancer</h2>
 
-<pre class="prettyprint"><code class="language-bach hljs bash">    <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/one_copy_cluster_dpdk
+
+
+<pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk 
+    <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/tstat-dpdk
     make</code></pre>
+
+
 
 <h1 id="3-system-configuration">3. <a></a>System Configuration</h1>
 
@@ -774,6 +793,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <p><strong>Note:</strong> To simplity the setup, all the steps can be automatically performed using the script <code>$TSTATDPDK/one_copy_cluster_dpdk/scripts/configure_machine.sh</code>. <br>
 Please verify that the script is doing the right operation for your system.</p>
+
+
 
 <h2 id="31-reserve-a-large-number-of-hugepages-to-dpdk">3.1 <a></a>Reserve a large number of hugepages to DPDK</h2>
 
@@ -793,6 +814,8 @@ Please verify that the script is doing the right operation for your system.</p>
 
 <p>To achieve the best performance, your CPU must always run at the highest speed. You need to have installed <code>cpufrequtils</code> package.</p>
 
+
+
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> cpufreq-set -r -g performance</code></pre>
 
 
@@ -801,6 +824,8 @@ Please verify that the script is doing the right operation for your system.</p>
 
 <p>Address Layout Space Randomization (ALSR) is a feature of Linux systems, that unfortunately sometimes makes DPDK application not to start properly (more info <a href="http://dpdk.org/doc/guides-1.8/prog_guide/multi_proc_support.html#multi-process-limitations">here</a>). <br>
 So we suggest to disable it by means of this command:</p>
+
+
 
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> bash -c <span class="hljs-string">"echo 0 &gt; /proc/sys/kernel/randomize_va_space"</span></code></pre>
 
@@ -811,6 +836,8 @@ So we suggest to disable it by means of this command:</p>
 <p>In order to use the DPDK framework on a NIC we need to change the driver associated to the network card. The driver is located within the <code>kmod</code> folder of the DPDK version compiled (recall the configuration of the <code>RTE_SDK</code> and <code>RTE_TARGET</code> used at compile time).</p>
 
 <p>The following command enable DPDK drivers for all DPDK-supported NICs</p>
+
+
 
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> modprobe uio
     <span class="hljs-built_in">sudo</span> insmod <span class="hljs-variable">$RTE_SDK</span>/<span class="hljs-variable">$RTE_TARGET</span>/kmod/igb_uio.ko
@@ -845,6 +872,8 @@ So we suggest to disable it by means of this command:</p>
 <p>For instance, in <code>one_copy_cluster_dpdk/tstat-conf</code> we provide a set of example configuration files (<code>tstat00.conf</code>, <code>tstat01.conf</code>, etc.) which include all Tstat plugins, RRDTool output stats and CryptoPAn IP addresses anonymization for log files. Fell free to configure the software as you like. <br>
 For more information please refer to the <a href="http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library">Tstat HOWTO</a></p>
 
+
+
 <h1 id="4-run-tstat-dpdk">4. <a></a>Run Tstat-DPDK</h1>
 
 <p><strong>Note:</strong> if, when running Tstat-DPDK, you encounter an error like this</p>
@@ -854,6 +883,8 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 <pre class="prettyprint"><code class=" hljs vhdl">    error <span class="hljs-keyword">while</span> loading <span class="hljs-keyword">shared</span> libraries: libtstat.so<span class="hljs-number">.0</span>: cannot <span class="hljs-keyword">open</span> <span class="hljs-keyword">shared</span> object <span class="hljs-keyword">file</span>: No such <span class="hljs-keyword">file</span> <span class="hljs-keyword">or</span> directory</code></pre>
 
 <p>make sure the environment  finds <code>libtstat</code>  shared object by running:</p>
+
+
 
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-keyword">export</span> LD_LIBRARY_PATH=/usr/local/lib</code></pre>
 
@@ -865,7 +896,9 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 
 <p>If you want to start 2 instances, type:</p>
 
-<pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> <span class="hljs-variable">$TSTATDPDK</span>/one_copy_cluster_dpdk/build/tstat_dpdk -c <span class="hljs-number">1</span> -n <span class="hljs-number">4</span> -- -m <span class="hljs-number">2</span></code></pre>
+
+
+<pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-built_in">sudo</span> <span class="hljs-variable">$TSTATDPDK</span>/tstat-dpdk/build/tstat_dpdk -c <span class="hljs-number">1</span> -n <span class="hljs-number">4</span> -- -m <span class="hljs-number">2</span></code></pre>
 
 <p>This executes Tstat-DPDK splitting the traffic among 2 separate Tstat processes.</p>
 
@@ -875,11 +908,13 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 
 <p><code>-m</code> option controls the <strong>number of pararallel instances</strong>.</p>
 
-<p><code>-c</code> and <code>-n</code> are DPDK-related. <strong>Do not change them.</strong></p>
+<p><code>-c</code> and <code>-n</code> are DPDK-related. <strong>Do not change them.</strong> They are related to CPU cores and memory channels to use. For more info refer to <a href="http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf">DPDK getting started guide</a>.</p>
 
 <p>Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.</p>
 
 <p>Below you have an example of this output</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs http"><span class="hljs-attribute">Instance</span>: <span class="hljs-string">0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%</span>
 <span class="hljs-attribute">Instance</span>: <span class="hljs-string">1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%</span></code></pre>
@@ -890,6 +925,8 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 
 <p>When quitting, the system prints overall statistics on its working divided by network interface and by instance. <br>
 The output has this form.</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs matlab">PORT: <span class="hljs-number">0</span> Rx: <span class="hljs-number">0</span> Drp: <span class="hljs-number">0</span> Tot: <span class="hljs-number">0</span> Perc: -<span class="hljs-built_in">nan</span><span class="hljs-comment">%</span>
     Queue <span class="hljs-number">0</span> Rx: <span class="hljs-number">0</span> Drp: <span class="hljs-number">0</span> Tot: <span class="hljs-number">0</span> Perc: -<span class="hljs-built_in">nan</span><span class="hljs-comment">%</span>
@@ -918,9 +955,11 @@ Time elapsed: <span class="hljs-number">2879.215</span>s</code></pre>
 
 <p>Tstat produces several log files for different events seen on the network. <br>
 Log files are kept separated for each instance and they are put in <code>$TSTATDPDK/one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out</code> where <code>XX</code> is the number of Tstat instance. <br>
-The name of these directories is hardcoded in the software and cannot be modified.</p>
+If you want to ovverride this setting you can use the <code>-s &lt;logdir&gt;</code> option in the Tstat configuration files.</p>
 
-<p>On the contrary, RRD database directory is specified in the configuration files of Tstat, so you can choose its location (recall that each instance must have its different database in different directories).</p>
+<p>RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the <code>-r &lt;rrd_dir&gt;</code> option (recall that each instance must have its different database in different directories).</p>
+
+
 
 <h2 id="44-system-performance-logs">4.4 <a></a>System Performance Logs</h2>
 
@@ -928,3 +967,52 @@ The name of these directories is hardcoded in the software and cannot be modifie
 Each instance writes in its own file (the <code>XX</code> in the name of the file is its number) statistics while it is running.</p>
 
 <p>This kind of output can be disabled by editing the source code – 5th line of <code>src/main_scheduler_multi_pool_auto_start.c</code> and commenting the <code>#define DEBUG</code> statement.</p>
+
+
+
+<h2 id="45-advanced-load-balancing">4.5 <a></a>Advanced load balancing</h2>
+
+<p>It is possible to configure the load balancing rule to optimize particular network setups.</p>
+
+<p>The default load balancing rule ensures that packets belonging to the same flow will be processed by the same Tstat instance. <br>
+In this way Tstat can produce per-flow consistent statistics. <br>
+Nevertheless the same client or server can appear in different Tstat instances in different TCP/UDP connections.</p>
+
+<p>If you set up Tstat in the outgoing link of local network, you can setup an advanced load balancing rule. <br>
+Since it might be useful to have the traffic of the same local network host to appear always in the same Tstat instance, you can configure load balancing as follows:</p>
+
+<ul>
+<li>The interface sniffing the traffic from the <strong>outgoing link</strong> loadbalances the traffic according to <strong>source IP</strong> address.</li>
+<li>The interface sniffing the traffic from the <strong>incoming link</strong> loadbalances the traffic according to <strong>destination IP</strong> address.</li>
+</ul>
+
+<p>To perform this action you have to modify few lines in the source code and then recompile as follows:</p>
+
+<ul>
+<li>In <code>$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c</code> file, find these lines</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class=" hljs cs">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
+    <span class="hljs-keyword">static</span> <span class="hljs-keyword">struct</span> port_dir port_directions [] = {};
+    <span class="hljs-keyword">static</span> uint8_t nb_port_directions = <span class="hljs-number">0</span>;</code></pre>
+
+<ul>
+<li>Modify them to respect your network configuration, like in this example:</li>
+</ul>
+
+
+
+<pre class="prettyprint"><code class=" hljs avrasm">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
+    static struct port_dir port_directions [] = {
+        { <span class="hljs-preprocessor">.pci</span>_address = <span class="hljs-string">"01:00.0"</span>, <span class="hljs-preprocessor">.is</span>_out=<span class="hljs-number">0</span> },
+        { <span class="hljs-preprocessor">.pci</span>_address = <span class="hljs-string">"01:00.1"</span>, <span class="hljs-preprocessor">.is</span>_out=<span class="hljs-number">1</span> },
+    }<span class="hljs-comment">;</span>
+    static uint8_t nb_port_directions = <span class="hljs-number">2</span><span class="hljs-comment">;</span></code></pre>
+
+<p>Where each entry in <code>port_directions</code> array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.</p>
+
+<ul>
+<li>Recompile the loadbalancer just typing <code>make</code> in <code>$TSTATDPDK/tstat-dpdk/</code> folder.</li>
+</ul>

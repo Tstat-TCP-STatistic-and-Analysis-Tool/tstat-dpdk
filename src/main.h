@@ -58,6 +58,12 @@ struct packet_container{
 	uint8_t data [2048-sizeof(struct timeval) - sizeof(uint16_t)];
 };
 
+/* Struct to init a port ith the correct seed according to its direction */
+struct port_dir{
+	char * pci_address;	//MAC address of the port in the form: XX:XX:X
+	uint8_t is_out;		// 1 if the port is towards the internet, 0 otherwise
+};
+
 /* RSS symmetrical 40 Byte seed, according to "Scalable TCP Session Monitoring with Symmetric Receive-side Scaling" (Shinae Woo, KyoungSoo Park from KAIST)  */
 uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
 			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
@@ -72,16 +78,16 @@ uint8_t rss_seed_alternative [] = {	0x6d, 0x5a, 0x6d, 0x5b, 0x6d, 0x5a, 0x6d, 0x
 					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
 };
 
-/* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
-uint8_t rss_seed_src_ip [] = { 	
+/* This seed is to load balance only respect destination IP, according to me (Martino Trevisan, from nowhere particular) */
+uint8_t rss_seed_dst_ip [] = { 	
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-/* This seed is to load balance only destination source IP, according to me (Martino Trevisan, from nowhere particular) */
-uint8_t rss_seed_dst_ip [] = { 	
+/* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
+uint8_t rss_seed_src_ip [] = { 	
 			0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -91,7 +97,7 @@ uint8_t rss_seed_dst_ip [] = {
 
 
 /* Struct for devices configuration for const defines see rte_ethdev.h */
-static const struct rte_eth_conf port_conf = {
+static struct rte_eth_conf port_conf = {
 	.rxmode = {
 		.mq_mode = ETH_MQ_RX_RSS,  	/* Enable RSS */
 	},

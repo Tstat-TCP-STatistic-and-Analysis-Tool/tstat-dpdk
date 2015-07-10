@@ -38,6 +38,9 @@ static int nb_sys_ports;
 static int nb_sys_cores;
 static int nb_istance;
 static int current_core;
+/* Use the next 2 variables to set up port direction */
+static struct port_dir port_directions [] = {};
+static uint8_t nb_port_directions = 0;
 /* Data structs of the system*/
 static struct rte_ring    * intermediate_ring;
 static struct rte_mempool * pktmbuf_pool [MAX_QUEUES];
@@ -495,19 +498,39 @@ static void init_port(int i) {
 		int j;
 		int ret;
 		uint8_t rss_key [40];
+		char pci_address[10];
 		struct rte_eth_link link;
 		struct rte_eth_dev_info dev_info;
 		struct rte_eth_rss_conf rss_conf;
+		struct rte_eth_conf port_conf_temp;
 		struct rte_eth_fdir fdir_conf;
 
 		/* Retreiving and printing device infos */
 		rte_eth_dev_info_get(i, &dev_info);
 		printf("Name:%s\n\tDriver name: %s\n\tMax rx queues: %d\n\tMax tx queues: %d\n", dev_info.pci_dev->driver->name,dev_info.driver_name, dev_info.max_rx_queues, dev_info.max_tx_queues);
-		printf("\tPCI Adress: %04d:%02d:%02x:%01d\n", dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+		printf("\tPCI Adress: %04d:%02d:%02x.%01d\n", dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
 		if (dev_info.max_rx_queues < nb_sys_cores) FATAL_ERROR("Every interface must have a queue on each core, but this is not supported. Quitting...\n");
 
+		/* Decide seed to give the port, by default use the classical symmetrical*/
+		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
+		port_conf_temp = port_conf;
+		for (j=0; j < nb_port_directions; j++){
+			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+			
+			/* If the port is outgoing, load balancing by ip source.*/
+			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out) {
+				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_src_ip;
+				printf("\t\tPort detected as outgoing. Load balancing by ip source.\n");
+			}
+
+			/* If the port is incoming, load balancing by ip destination.*/		
+			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  !port_directions[j].is_out) {
+				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_dst_ip;
+				printf("\t\tPort detected as incoming. Load balancing by ip destination.\n");
+			}	
+		}
 		/* Configure device with 'nb_sys_cores' rx queues and 1 tx queue */
-		ret = rte_eth_dev_configure(i, nb_sys_cores, 1, &port_conf);
+		ret = rte_eth_dev_configure(i, nb_sys_cores, 1, &port_conf_temp);
 		if (ret < 0) rte_panic("Error configuring the port\n");
 
 		/* For each RX queue in each NIC rte_socket_id()  */

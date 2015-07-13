@@ -1,645 +1,13 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tstat-DPDK Readme</title>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tstat-DPDK Readme</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
 </head>
-
-<style>
-@font-face {
-  font-family: octicons-anchor;
-  src: url(data:font/woff;charset=utf-8;base64,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) format('woff');
-}
-
-.markdown-body {
-  -ms-text-size-adjust: 100%;
-  -webkit-text-size-adjust: 100%;
-  color: #333;
-  font-family: "Helvetica Neue", Helvetica, "Segoe UI", Arial, freesans, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  word-wrap: break-word;
-}
-
-.markdown-body a {
-  background: transparent;
-}
-
-.markdown-body a:active,
-.markdown-body a:hover {
-  outline: 0;
-}
-
-.markdown-body strong {
-  font-weight: bold;
-}
-
-.markdown-body h1 {
-  font-size: 2em;
-  margin: 0.67em 0;
-}
-
-.markdown-body img {
-  border: 0;
-}
-
-.markdown-body hr {
-  -moz-box-sizing: content-box;
-  box-sizing: content-box;
-  height: 0;
-}
-
-.markdown-body pre {
-  overflow: auto;
-}
-
-.markdown-body code,
-.markdown-body kbd,
-.markdown-body pre {
-  font-family: monospace, monospace;
-  font-size: 1em;
-}
-
-.markdown-body input {
-  color: inherit;
-  font: inherit;
-  margin: 0;
-}
-
-.markdown-body html input[disabled] {
-  cursor: default;
-}
-
-.markdown-body input {
-  line-height: normal;
-}
-
-.markdown-body input[type="checkbox"] {
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-  padding: 0;
-}
-
-.markdown-body table {
-  border-collapse: collapse;
-  border-spacing: 0;
-}
-
-.markdown-body td,
-.markdown-body th {
-  padding: 0;
-}
-
-.markdown-body * {
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
-
-.markdown-body input {
-  font: 13px/1.4 Helvetica, arial, freesans, clean, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
-}
-
-.markdown-body a {
-  color: #4183c4;
-  text-decoration: none;
-}
-
-.markdown-body a:hover,
-.markdown-body a:focus,
-.markdown-body a:active {
-  text-decoration: underline;
-}
-
-.markdown-body hr {
-  height: 0;
-  margin: 15px 0;
-  overflow: hidden;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid #ddd;
-}
-
-.markdown-body hr:before {
-  display: table;
-  content: "";
-}
-
-.markdown-body hr:after {
-  display: table;
-  clear: both;
-  content: "";
-}
-
-.markdown-body h1,
-.markdown-body h2,
-.markdown-body h3,
-.markdown-body h4,
-.markdown-body h5,
-.markdown-body h6 {
-  margin-top: 15px;
-  margin-bottom: 15px;
-  line-height: 1.1;
-}
-
-.markdown-body h1 {
-  font-size: 30px;
-}
-
-.markdown-body h2 {
-  font-size: 21px;
-}
-
-.markdown-body h3 {
-  font-size: 16px;
-}
-
-.markdown-body h4 {
-  font-size: 14px;
-}
-
-.markdown-body h5 {
-  font-size: 12px;
-}
-
-.markdown-body h6 {
-  font-size: 11px;
-}
-
-.markdown-body blockquote {
-  margin: 0;
-}
-
-.markdown-body ul,
-.markdown-body ol {
-  padding: 0;
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.markdown-body ol ol,
-.markdown-body ul ol {
-  list-style-type: lower-roman;
-}
-
-.markdown-body ul ul ol,
-.markdown-body ul ol ol,
-.markdown-body ol ul ol,
-.markdown-body ol ol ol {
-  list-style-type: lower-alpha;
-}
-
-.markdown-body dd {
-  margin-left: 0;
-}
-
-.markdown-body code {
-  font: 12px Consolas, "Liberation Mono", Menlo, Courier, monospace;
-}
-
-.markdown-body pre {
-  margin-top: 0;
-  margin-bottom: 0;
-  font: 12px Consolas, "Liberation Mono", Menlo, Courier, monospace;
-}
-
-.markdown-body .octicon {
-  font: normal normal 16px octicons-anchor;
-  line-height: 1;
-  display: inline-block;
-  text-decoration: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-.markdown-body .octicon-link:before {
-  content: '\f05c';
-}
-
-.markdown-body>*:first-child {
-  margin-top: 0 !important;
-}
-
-.markdown-body>*:last-child {
-  margin-bottom: 0 !important;
-}
-
-.markdown-body .anchor {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  display: block;
-  padding-right: 6px;
-  padding-left: 30px;
-  margin-left: -30px;
-}
-
-.markdown-body .anchor:focus {
-  outline: none;
-}
-
-.markdown-body h1,
-.markdown-body h2,
-.markdown-body h3,
-.markdown-body h4,
-.markdown-body h5,
-.markdown-body h6 {
-  position: relative;
-  margin-top: 1em;
-  margin-bottom: 16px;
-  font-weight: bold;
-  line-height: 1.4;
-}
-
-.markdown-body h1 .octicon-link,
-.markdown-body h2 .octicon-link,
-.markdown-body h3 .octicon-link,
-.markdown-body h4 .octicon-link,
-.markdown-body h5 .octicon-link,
-.markdown-body h6 .octicon-link {
-  display: none;
-  color: #000;
-  vertical-align: middle;
-}
-
-.markdown-body h1:hover .anchor,
-.markdown-body h2:hover .anchor,
-.markdown-body h3:hover .anchor,
-.markdown-body h4:hover .anchor,
-.markdown-body h5:hover .anchor,
-.markdown-body h6:hover .anchor {
-  padding-left: 8px;
-  margin-left: -30px;
-  line-height: 1;
-  text-decoration: none;
-}
-
-.markdown-body h1:hover .anchor .octicon-link,
-.markdown-body h2:hover .anchor .octicon-link,
-.markdown-body h3:hover .anchor .octicon-link,
-.markdown-body h4:hover .anchor .octicon-link,
-.markdown-body h5:hover .anchor .octicon-link,
-.markdown-body h6:hover .anchor .octicon-link {
-  display: inline-block;
-}
-
-.markdown-body h1 {
-  padding-bottom: 0.3em;
-  font-size: 2.25em;
-  line-height: 1.2;
-  border-bottom: 1px solid #eee;
-}
-
-.markdown-body h2 {
-  padding-bottom: 0.3em;
-  font-size: 1.75em;
-  line-height: 1.225;
-  border-bottom: 1px solid #eee;
-}
-
-.markdown-body h3 {
-  font-size: 1.5em;
-  line-height: 1.43;
-}
-
-.markdown-body h4 {
-  font-size: 1.25em;
-}
-
-.markdown-body h5 {
-  font-size: 1em;
-}
-
-.markdown-body h6 {
-  font-size: 1em;
-  color: #777;
-}
-
-.markdown-body p,
-.markdown-body blockquote,
-.markdown-body ul,
-.markdown-body ol,
-.markdown-body dl,
-.markdown-body table,
-.markdown-body pre {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-
-.markdown-body hr {
-  height: 4px;
-  padding: 0;
-  margin: 16px 0;
-  background-color: #e7e7e7;
-  border: 0 none;
-}
-
-.markdown-body ul,
-.markdown-body ol {
-  padding-left: 2em;
-}
-
-.markdown-body ul ul,
-.markdown-body ul ol,
-.markdown-body ol ol,
-.markdown-body ol ul {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.markdown-body li>p {
-  margin-top: 16px;
-}
-
-.markdown-body dl {
-  padding: 0;
-}
-
-.markdown-body dl dt {
-  padding: 0;
-  margin-top: 16px;
-  font-size: 1em;
-  font-style: italic;
-  font-weight: bold;
-}
-
-.markdown-body dl dd {
-  padding: 0 16px;
-  margin-bottom: 16px;
-}
-
-.markdown-body blockquote {
-  padding: 0 15px;
-  color: #777;
-  border-left: 4px solid #ddd;
-}
-
-.markdown-body blockquote>:first-child {
-  margin-top: 0;
-}
-
-.markdown-body blockquote>:last-child {
-  margin-bottom: 0;
-}
-
-.markdown-body table {
-  display: block;
-  width: 100%;
-  overflow: auto;
-  word-break: normal;
-  word-break: keep-all;
-}
-
-.markdown-body table th {
-  font-weight: bold;
-}
-
-.markdown-body table th,
-.markdown-body table td {
-  padding: 6px 13px;
-  border: 1px solid #ddd;
-}
-
-.markdown-body table tr {
-  background-color: #fff;
-  border-top: 1px solid #ccc;
-}
-
-.markdown-body table tr:nth-child(2n) {
-  background-color: #f8f8f8;
-}
-
-.markdown-body img {
-  max-width: 100%;
-  -moz-box-sizing: border-box;
-  box-sizing: border-box;
-}
-
-.markdown-body code {
-  padding: 0;
-  padding-top: 0.2em;
-  padding-bottom: 0.2em;
-  margin: 0;
-  font-size: 85%;
-  background-color: rgba(0,0,0,0.04);
-  border-radius: 3px;
-}
-
-.markdown-body code:before,
-.markdown-body code:after {
-  letter-spacing: -0.2em;
-  content: "\00a0";
-}
-
-.markdown-body pre>code {
-  padding: 0;
-  margin: 0;
-  font-size: 100%;
-  word-break: normal;
-  white-space: pre;
-  background: transparent;
-  border: 0;
-}
-
-.markdown-body .highlight {
-  margin-bottom: 16px;
-}
-
-.markdown-body .highlight pre,
-.markdown-body pre {
-  padding: 16px;
-  overflow: auto;
-  font-size: 85%;
-  line-height: 1.45;
-  background-color: #f7f7f7;
-  border-radius: 3px;
-}
-
-.markdown-body .highlight pre {
-  margin-bottom: 0;
-  word-break: normal;
-}
-
-.markdown-body pre {
-  word-wrap: normal;
-}
-
-.markdown-body pre code {
-  display: inline;
-  max-width: initial;
-  padding: 0;
-  margin: 0;
-  overflow: initial;
-  line-height: inherit;
-  word-wrap: normal;
-  background-color: transparent;
-  border: 0;
-}
-
-.markdown-body pre code:before,
-.markdown-body pre code:after {
-  content: normal;
-}
-
-.markdown-body .pl-c {
-  color: #969896;
-}
-
-.markdown-body .pl-c1,
-.markdown-body .pl-mdh,
-.markdown-body .pl-mm,
-.markdown-body .pl-mp,
-.markdown-body .pl-mr,
-.markdown-body .pl-s1 .pl-v,
-.markdown-body .pl-s3,
-.markdown-body .pl-sc,
-.markdown-body .pl-sv {
-  color: #0086b3;
-}
-
-.markdown-body .pl-e,
-.markdown-body .pl-en {
-  color: #795da3;
-}
-
-.markdown-body .pl-s1 .pl-s2,
-.markdown-body .pl-smi,
-.markdown-body .pl-smp,
-.markdown-body .pl-stj,
-.markdown-body .pl-vo,
-.markdown-body .pl-vpf {
-  color: #333;
-}
-
-.markdown-body .pl-ent {
-  color: #63a35c;
-}
-
-.markdown-body .pl-k,
-.markdown-body .pl-s,
-.markdown-body .pl-st {
-  color: #a71d5d;
-}
-
-.markdown-body .pl-pds,
-.markdown-body .pl-s1,
-.markdown-body .pl-s1 .pl-pse .pl-s2,
-.markdown-body .pl-sr,
-.markdown-body .pl-sr .pl-cce,
-.markdown-body .pl-sr .pl-sra,
-.markdown-body .pl-sr .pl-sre,
-.markdown-body .pl-src,
-.markdown-body .pl-v {
-  color: #df5000;
-}
-
-.markdown-body .pl-id {
-  color: #b52a1d;
-}
-
-.markdown-body .pl-ii {
-  background-color: #b52a1d;
-  color: #f8f8f8;
-}
-
-.markdown-body .pl-sr .pl-cce {
-  color: #63a35c;
-  font-weight: bold;
-}
-
-.markdown-body .pl-ml {
-  color: #693a17;
-}
-
-.markdown-body .pl-mh,
-.markdown-body .pl-mh .pl-en,
-.markdown-body .pl-ms {
-  color: #1d3e81;
-  font-weight: bold;
-}
-
-.markdown-body .pl-mq {
-  color: #008080;
-}
-
-.markdown-body .pl-mi {
-  color: #333;
-  font-style: italic;
-}
-
-.markdown-body .pl-mb {
-  color: #333;
-  font-weight: bold;
-}
-
-.markdown-body .pl-md,
-.markdown-body .pl-mdhf {
-  background-color: #ffecec;
-  color: #bd2c00;
-}
-
-.markdown-body .pl-mdht,
-.markdown-body .pl-mi1 {
-  background-color: #eaffea;
-  color: #55a532;
-}
-
-.markdown-body .pl-mdr {
-  color: #795da3;
-  font-weight: bold;
-}
-
-.markdown-body .pl-mo {
-  color: #1d3e81;
-}
-
-.markdown-body kbd {
-  background-color: #e7e7e7;
-  background-image: -webkit-linear-gradient(#fefefe, #e7e7e7);
-  background-image: linear-gradient(#fefefe, #e7e7e7);
-  background-repeat: repeat-x;
-  display: inline-block;
-  padding: 3px 5px;
-  font: 11px Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  line-height: 10px;
-  color: #000;
-  border: 1px solid #cfcfcf;
-  border-radius: 2px;
-}
-
-.markdown-body .task-list-item {
-  list-style-type: none;
-}
-
-.markdown-body .task-list-item+.task-list-item {
-  margin-top: 3px;
-}
-
-.markdown-body .task-list-item input {
-  float: left;
-  margin: 0.3em 0 0.25em -1.6em;
-  vertical-align: middle;
-}
-
-.markdown-body :checked+.radio-label {
-  z-index: 1;
-  position: relative;
-  border-color: #4183c4;
-}
-    .markdown-body {
-        min-width: 200px;
-        max-width: 790px;
-        margin: 0 auto;
-        padding: 30px;
-    }
-</style>
-
-<body class="markdown-body">
-
-<!--  *************************************** PUT HERE THE RAW HTML CODE *************************************** -->
-
-
-<h1 id="tstat-dpdk-quick-start-guide">Tstat-DPDK Quick Start Guide</h1>
+<body><div class="container"><h1 id="tstat-dpdk-quick-start-guide">Tstat-DPDK Quick Start Guide</h1>
 
 <ul>
 <li><a href="#intro">1. Introduction</a></li>
@@ -736,11 +104,9 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <h2 id="22-installing-tstat-dpdk">2.2 <a></a>Installing Tstat DPDK</h2>
 
-<p>This step requires to compile both Tstat and the DPDK cluster application. They are both available under Tstat SVN repository.   </p>
+<p>This step requires to compile both Tstat and the DPDK load-balancer application. They are both available under Tstat SVN repository.   </p>
 
-<p>As previously pointed out, the DPDK cluster acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with <code>$TSTATDPDK</code>.</p>
-
-
+<p>As previously pointed out, the DPDK wrapper acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with <code>$TSTATDPDK</code>.</p>
 
 <h2 id="221-installing-last-version-of-tstat">2.2.1 <a></a>Installing last version of Tstat</h2>
 
@@ -791,10 +157,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <p>Before running Tstat-DPDK there are few things to do.</p>
 
-<p><strong>Note:</strong> To simplity the setup, all the steps can be automatically performed using the script <code>$TSTATDPDK/one_copy_cluster_dpdk/scripts/configure_machine.sh</code>. <br>
+<p><strong>Note:</strong> To simplity the setup, all the steps can be automatically performed using the script <code>$TSTATDPDK/tstat-dpdk/scripts/configure_machine.sh</code>. <br>
 Please verify that the script is doing the right operation for your system.</p>
-
-
 
 <h2 id="31-reserve-a-large-number-of-hugepages-to-dpdk">3.1 <a></a>Reserve a large number of hugepages to DPDK</h2>
 
@@ -869,10 +233,8 @@ So we suggest to disable it by means of this command:</p>
 
 <p>Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.</p>
 
-<p>For instance, in <code>one_copy_cluster_dpdk/tstat-conf</code> we provide a set of example configuration files (<code>tstat00.conf</code>, <code>tstat01.conf</code>, etc.) which include all Tstat plugins, RRDTool output stats and CryptoPAn IP addresses anonymization for log files. Fell free to configure the software as you like. <br>
+<p>For instance, in <code>$TSTATDPDK/tstat-dpdk/tstat-conf</code> we provide a set of example configuration files (<code>tstat00.conf</code>, <code>tstat01.conf</code>, etc.) which include all Tstat plugins and log files, RRDTool output stats and. Fell free to configure the software as you like. <br>
 For more information please refer to the <a href="http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library">Tstat HOWTO</a></p>
-
-
 
 <h1 id="4-run-tstat-dpdk">4. <a></a>Run Tstat-DPDK</h1>
 
@@ -910,11 +272,9 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 
 <p><code>-c</code> and <code>-n</code> are DPDK-related. <strong>Do not change them.</strong> They are related to CPU cores and memory channels to use. For more info refer to <a href="http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf">DPDK getting started guide</a>.</p>
 
-<p>Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.</p>
+<p>Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.</p>
 
 <p>Below you have an example of this output</p>
-
-
 
 <pre class="prettyprint"><code class=" hljs http"><span class="hljs-attribute">Instance</span>: <span class="hljs-string">0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%</span>
 <span class="hljs-attribute">Instance</span>: <span class="hljs-string">1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%</span></code></pre>
@@ -954,21 +314,17 @@ Time elapsed: <span class="hljs-number">2879.215</span>s</code></pre>
 <h2 id="43-log-files-directory">4.3 <a></a>Log Files Directory</h2>
 
 <p>Tstat produces several log files for different events seen on the network. <br>
-Log files are kept separated for each instance and they are put in <code>$TSTATDPDK/one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out</code> where <code>XX</code> is the number of Tstat instance. <br>
+Log files are kept separated for each instance and they are put in <code>$TSTATDPDK/tstat-dpdk/tstat-logs/tstatXX.log.out</code> where <code>XX</code> is the number of Tstat instance. <br>
 If you want to ovverride this setting you can use the <code>-s &lt;logdir&gt;</code> option in the Tstat configuration files.</p>
 
 <p>RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the <code>-r &lt;rrd_dir&gt;</code> option (recall that each instance must have its different database in different directories).</p>
 
-
-
 <h2 id="44-system-performance-logs">4.4 <a></a>System Performance Logs</h2>
 
-<p>In the directory <code>$TSTATDPDK/one_copy_cluster_dpdk/tstat-stats</code> there is a set of file called <code>statsXX.txt</code>. <br>
+<p>In the directory <code>$TSTATDPDK/tstat-dpdk/tstat-stats</code> there is a set of file called <code>statsXX.txt</code>. <br>
 Each instance writes in its own file (the <code>XX</code> in the name of the file is its number) statistics while it is running.</p>
 
 <p>This kind of output can be disabled by editing the source code – 5th line of <code>src/main_scheduler_multi_pool_auto_start.c</code> and commenting the <code>#define DEBUG</code> statement.</p>
-
-
 
 <h2 id="45-advanced-load-balancing">4.5 <a></a>Advanced load balancing</h2>
 
@@ -976,10 +332,10 @@ Each instance writes in its own file (the <code>XX</code> in the name of the fil
 
 <p>The default load balancing rule ensures that packets belonging to the same flow will be processed by the same Tstat instance. <br>
 In this way Tstat can produce per-flow consistent statistics. <br>
-Nevertheless the same client or server can appear in different Tstat instances in different TCP/UDP connections.</p>
+Nevertheless the same host can appear in different Tstat instances for different TCP/UDP connections.</p>
 
-<p>If you set up Tstat in the outgoing link of local network, you can setup an advanced load balancing rule. <br>
-Since it might be useful to have the traffic of the same local network host to appear always in the same Tstat instance, you can configure load balancing as follows:</p>
+<p>If you set up Tstat-DPDK in the links connecting a local network to the internet, you can setup an advanced load balancing rule. <br>
+Since it might be useful to have <strong>the traffic of the same local network host to appear always in the same Tstat instance</strong>, you can configure load balancing as follows:</p>
 
 <ul>
 <li>The interface sniffing the traffic from the <strong>outgoing link</strong> loadbalances the traffic according to <strong>source IP</strong> address.</li>
@@ -988,21 +344,13 @@ Since it might be useful to have the traffic of the same local network host to a
 
 <p>To perform this action you have to modify few lines in the source code and then recompile as follows:</p>
 
-<ul>
-<li>In <code>$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c</code> file, find these lines</li>
-</ul>
-
-
+<p><strong>1.</strong> In <code>$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c</code> file, find these lines</p>
 
 <pre class="prettyprint"><code class=" hljs cs">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
     <span class="hljs-keyword">static</span> <span class="hljs-keyword">struct</span> port_dir port_directions [] = {};
     <span class="hljs-keyword">static</span> uint8_t nb_port_directions = <span class="hljs-number">0</span>;</code></pre>
 
-<ul>
-<li>Modify them to respect your network configuration, like in this example:</li>
-</ul>
-
-
+<p><strong>2.</strong> Modify them to respect your network configuration, like in this example:</p>
 
 <pre class="prettyprint"><code class=" hljs avrasm">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
     static struct port_dir port_directions [] = {
@@ -1013,6 +361,5 @@ Since it might be useful to have the traffic of the same local network host to a
 
 <p>Where each entry in <code>port_directions</code> array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.</p>
 
-<ul>
-<li>Recompile the loadbalancer just typing <code>make</code> in <code>$TSTATDPDK/tstat-dpdk/</code> folder.</li>
-</ul>
+<p><strong>3.</strong> Recompile the loadbalancer just typing <code>make</code> in <code>$TSTATDPDK/tstat-dpdk/</code> folder.</p></div></body>
+</html>

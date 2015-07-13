@@ -82,9 +82,9 @@ We highly recommend to use **Install DPDK v1.8.0**. With other versions it is **
 
 ## 2.2 <a name="inst-tstat-dpdk"></a>Installing Tstat DPDK
 
-This step requires to compile both Tstat and the DPDK cluster application. They are both available under Tstat SVN repository.   
+This step requires to compile both Tstat and the DPDK load-balancer application. They are both available under Tstat SVN repository.   
 
-As previously pointed out, the DPDK cluster acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with `$TSTATDPDK`.
+As previously pointed out, the DPDK wrapper acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with `$TSTATDPDK`.
 
 ## 2.2.1 <a name="comp-libtstat"></a>Installing last version of Tstat
 
@@ -128,7 +128,7 @@ This indicates both `libpcap` and `rrdtool` libraries have been correctly found 
 
 Before running Tstat-DPDK there are few things to do.
 
-**Note:** To simplity the setup, all the steps can be automatically performed using the script `$TSTATDPDK/one_copy_cluster_dpdk/scripts/configure_machine.sh`.
+**Note:** To simplity the setup, all the steps can be automatically performed using the script `$TSTATDPDK/tstat-dpdk/scripts/configure_machine.sh`.
 Please verify that the script is doing the right operation for your system.
 
 ## 3.1 <a name="conf-hugepage"></a>Reserve a large number of hugepages to DPDK
@@ -190,7 +190,7 @@ Network devices using kernel driver
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
-For instance, in `one_copy_cluster_dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which include all Tstat plugins, RRDTool output stats and CryptoPAn IP addresses anonymization for log files. Fell free to configure the software as you like.
+For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which include all Tstat plugins and log files, RRDTool output stats and. Fell free to configure the software as you like.
 For more information please refer to the [Tstat HOWTO](http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library)
 
 
@@ -225,7 +225,7 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-c` and `-n` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
-Approximatively every second, the DPDK cluster prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
+Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
 
 Below you have an example of this output
 ```
@@ -262,13 +262,13 @@ Time elapsed: 2879.215s
 ```
 ## 4.3 <a name="logs"></a>Log Files Directory
 Tstat produces several log files for different events seen on the network.
-Log files are kept separated for each instance and they are put in `$TSTATDPDK/one_copy_cluster_dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
+Log files are kept separated for each instance and they are put in `$TSTATDPDK/tstat-dpdk/tstat-logs/tstatXX.log.out` where `XX` is the number of Tstat instance.
 If you want to ovverride this setting you can use the `-s <logdir>` option in the Tstat configuration files.
 
 RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the `-r <rrd_dir>` option (recall that each instance must have its different database in different directories).
 
 ## 4.4 <a name="logs-perf"></a>System Performance Logs
-In the directory `$TSTATDPDK/one_copy_cluster_dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
+In the directory `$TSTATDPDK/tstat-dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
 
 This kind of output can be disabled by editing the source code -- 5th line of `src/main_scheduler_multi_pool_auto_start.c` and commenting the `#define DEBUG` statement.
@@ -278,24 +278,24 @@ It is possible to configure the load balancing rule to optimize particular netwo
 
 The default load balancing rule ensures that packets belonging to the same flow will be processed by the same Tstat instance.
 In this way Tstat can produce per-flow consistent statistics.
-Nevertheless the same client or server can appear in different Tstat instances in different TCP/UDP connections.
+Nevertheless the same host can appear in different Tstat instances for different TCP/UDP connections.
 
-If you set up Tstat in the outgoing link of local network, you can setup an advanced load balancing rule.
-Since it might be useful to have the traffic of the same local network host to appear always in the same Tstat instance, you can configure load balancing as follows:
+If you set up Tstat-DPDK in the links connecting a local network to the internet, you can setup an advanced load balancing rule.
+Since it might be useful to have **the traffic of the same local network host to appear always in the same Tstat instance**, you can configure load balancing as follows:
 
 * The interface sniffing the traffic from the **outgoing link** loadbalances the traffic according to **source IP** address.
 * The interface sniffing the traffic from the **incoming link** loadbalances the traffic according to **destination IP** address.
 
 To perform this action you have to modify few lines in the source code and then recompile as follows:
 
-* In `$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c` file, find these lines
+**1.** In `$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c` file, find these lines
 
 ```
 	/* Use the next 2 variables to set up port direction */
 	static struct port_dir port_directions [] = {};
 	static uint8_t nb_port_directions = 0;
 ```
-* Modify them to respect your network configuration, like in this example:
+**2.** Modify them to respect your network configuration, like in this example:
 
 ```
 	/* Use the next 2 variables to set up port direction */
@@ -308,4 +308,4 @@ To perform this action you have to modify few lines in the source code and then 
 
 Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
 
-* Recompile the loadbalancer just typing `make` in `$TSTATDPDK/tstat-dpdk/` folder.
+**3.** Recompile the loadbalancer just typing `make` in `$TSTATDPDK/tstat-dpdk/` folder.

@@ -488,7 +488,7 @@ static void init_port(int i) {
 		printf("\tPCI Adress: %04d:%02d:%02x.%01d\n", dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
 		if (dev_info.max_rx_queues < nb_sys_cores) FATAL_ERROR("Every interface must have a queue on each core, but this is not supported. Quitting...\n");
 
-		/* Decide seed to give the port, by default use the classical symmetrical*/
+		/* Decide the seed to give the port, by default use the classical symmetrical*/
 		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
 		port_conf_temp = port_conf;
 		for (j=0; j < nb_port_directions; j++){
@@ -591,7 +591,7 @@ static void create_port_to_direction_array(void){
 	/* For each port */
 	for (i=0; i<nb_sys_ports;i++){
 
-		/* Retreiving and printing device infos */
+		/* Retreiving device infos */
 		rte_eth_dev_info_get(i, &dev_info);
 
 		/* By default the port is neither incoming nor outgoing */

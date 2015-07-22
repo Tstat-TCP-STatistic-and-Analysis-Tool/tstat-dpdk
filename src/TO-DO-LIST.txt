@@ -1,9 +1,10 @@
 Middle term work:
 1. Ability of the cluster of discerning internal or external traffic by of direction of the port
-2. Ability of detecting non-IP or non-ETH packets (VLAN, MPLS...)
+2 [WAIT FOR CONTROLLED TESTS]. Ability of detecting non-IP or non-ETH packets (VLAN, MPLS...)
+
 3 [DONE]. Customize load-balancing rules.
 4 [DONE]. Changeable log files directories
 5 [DONE]. Check full compatibility with Tstat 3.0 (RRD, directories, constants, DNHunter)
 
-Martnio Trevisan,
+Martino Trevisan,
 1/7/2015

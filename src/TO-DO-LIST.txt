@@ -1,5 +1,5 @@
 Middle term work:
-1. Ability of the cluster of discerning internal or external traffic by of direction of the port
+1 [DONE]. Ability of the cluster of discerning internal or external traffic by of direction of the port
 2 [WAIT FOR CONTROLLED TESTS]. Ability of detecting non-IP or non-ETH packets (VLAN, MPLS...)
 
 3 [DONE]. Customize load-balancing rules.

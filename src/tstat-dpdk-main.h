@@ -47,6 +47,7 @@
 /* Function prototypes */
 static int main_loop_producer(__attribute__((unused)) void * arg);
 static int main_loop_consumer(__attribute__((unused)) void * arg);
+static void create_port_to_direction_array(void);
 static void sig_handler(int signo);
 static void init_port(int i);
 static int parse_args(int argc, char **argv);

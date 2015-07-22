@@ -51,17 +51,17 @@ int main(int argc, char **argv)
 	signal(SIGTERM, sig_handler);
 	signal(SIGINT, sig_handler);
 
-	/* Make standard output silent 
-	rte_set_log_level 	( 1);
-	rte_set_log_type (RTE_LOGTYPE_EAL, 0);
-	rte_set_log_type (RTE_LOGTYPE_PMD, 0);
-	rte_openlog_stream(fopen("/dev/null", "w"));*/
-
 	/* Initialize DPDK enviroment with args, then shift argc and argv to get application parameters */
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0) FATAL_ERROR("Cannot init EAL\n");
 	argc -= ret;
 	argv += ret;
+
+	/* Make standard output more silent */
+	rte_set_log_level 	( RTE_LOG_EMERG );
+	rte_set_log_type (RTE_LOGTYPE_EAL, 0);
+	rte_set_log_type (RTE_LOGTYPE_PMD, 0);
+	rte_openlog_stream(fopen("/dev/null", "w"));
 
 	/* Check if this application can use one core*/
 	ret = rte_lcore_count ();
@@ -122,6 +122,9 @@ int main(int argc, char **argv)
 
 		}
 	}
+
+	/* Create the port_to_direction array*/
+	create_port_to_direction_array();
 
 	/* Start producer thread (on the same core) */
 	ret = pthread_create(&producer_t, NULL, (void *(*)(void *))main_loop_producer, NULL);
@@ -255,6 +258,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 			m->tx_offload = t_pack.tv_sec;
 			m->udata64 =  t_pack.tv_usec;
 
+
 			/* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
 			#ifdef SUM_IP
 				/* Add a number to ip address if needed */
@@ -310,7 +314,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 	file_name[18] += nb_istance%10;	
 	debug_file = fopen(file_name, "w");
 	fprintf(debug_file, "# PKTS        AVG          MAX      STDEV  TCP_FLW  UDP_FLW  INC_RATE LOSS_RATE MEM_PERC\n");
-
+	
 	/* Infinite loop for consumer thread */
 	for(;;){
 
@@ -336,7 +340,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
-
+		
 		/* Update stats */
 		nb_tstat_packets++;
 		avg = avg + interval;
@@ -487,22 +491,18 @@ static void init_port(int i) {
 		/* Decide seed to give the port, by default use the classical symmetrical*/
 		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
 		port_conf_temp = port_conf;
-		/* By default the port is neither incoming nor outgoing */
-		port_to_direction[i] = 0;
 		for (j=0; j < nb_port_directions; j++){
 			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
 			
 			/* If the port is outgoing, load balancing by ip source.*/
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out) {
 				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_src_ip;
-				port_to_direction[i] = 2;
 				printf("\t\tPort detected as outgoing. Load balancing by ip source.\n");
 			}
 
 			/* If the port is incoming, load balancing by ip destination.*/		
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  !port_directions[j].is_out) {
 				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_dst_ip;
-				port_to_direction[i] = 3;
 				printf("\t\tPort detected as incoming. Load balancing by ip destination.\n");
 			}	
 		}
@@ -579,6 +579,39 @@ static void init_port(int i) {
 		#endif */
 	
 }
+
+
+/* The aim of this function is to populate the port_to_direction array from the mac address information */
+static void create_port_to_direction_array(void){
+
+	int i, j;
+	char pci_address[10];
+	struct rte_eth_dev_info dev_info;
+
+	/* For each port */
+	for (i=0; i<nb_sys_ports;i++){
+
+		/* Retreiving and printing device infos */
+		rte_eth_dev_info_get(i, &dev_info);
+
+		/* By default the port is neither incoming nor outgoing */
+		port_to_direction[i] = 0;
+
+		for (j=0; j < nb_port_directions; j++){
+			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+			
+			/* If the port is outgoing, load balancing by ip source.*/
+			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out)
+				port_to_direction[i] = 2;
+
+			/* If the port is incoming, load balancing by ip destination.*/		
+			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  !port_directions[j].is_out)
+				port_to_direction[i] = 3;
+				
+		}
+	}
+}
+
 
 static int parse_args(int argc, char **argv)
 {

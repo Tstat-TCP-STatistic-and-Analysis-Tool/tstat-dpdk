@@ -33,15 +33,16 @@
 #define STAT_FILE "tstat-stats/stats00.txt"			// define the file statistics are put in. Every instance has got statsX.txt file
 
 /* Use the next 2 variables to set up port direction, e.g. 
+
 	static struct port_dir port_directions [] = {
 		{ .pci_address = "01:00.0", .is_out=0 },
 		{ .pci_address = "01:00.1", .is_out=1 },
 	};
 	static uint8_t nb_port_directions = 2;
 */
+
 static struct port_dir port_directions [] = {};
 static uint8_t nb_port_directions = 0;
-
 
 /* RSS symmetrical 40 Byte seed, according to "Scalable TCP Session Monitoring with Symmetric Receive-side Scaling" (Shinae Woo, KyoungSoo Park from KAIST)  */
 uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,

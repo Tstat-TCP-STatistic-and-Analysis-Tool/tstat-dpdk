@@ -340,7 +340,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
-		
+
 		/* Update stats */
 		nb_tstat_packets++;
 		avg = avg + interval;

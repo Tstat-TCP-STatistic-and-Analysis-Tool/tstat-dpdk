@@ -1,36 +1,7 @@
-#include "main.h"
-#include "main_scheduler.h"
+#include "tstat-dpdk-main.h"
+#include "tstat-dpdk-params.h"
+#include "tstat-dpdk-sched-params.h"
 
-/* If you define DEBUG, stats will be printed */
-#define DEBUG
-/* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
-//#define DEBUG_DEADLINE
-/* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
-//#define SUM_IP
-
-/* Constants of the system */
-#define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
-#define TSTAT_LOG_DIR "tstat-logs/tstat00.log"
-
-#define SCHED_RUNTIME_NS     (   1000*1000)				// Scheduling parameters in ns: 	activity time:	1000 us
-#define SCHED_TOTALTIME_NS   ( 2*1000*1000)				//					period time:	2000 us
-#define CPU_SET_NAME "tstat-dpdk00"
-
-#define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
-#define MEMPOOL_ELEM_NB (524288-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
-#define MEMPOOL_ELEM_SZ 2048  					// Power of two greater than 1500
-#define MEMPOOL_CACHE_SZ 0  					// MUST BE 0 WITH SCHED_DEADLINE, otherwise the driver wil crash !!
-#define MAX_QUEUES 16
-
-#define INTERMEDIATERING_NAME "intermedate_ring"
-#define INTERMEDIATERING_SZ (MEMPOOL_ELEM_NB+1)
-
-#define RX_QUEUE_SZ 4096			// The size of rx queue. Max is 4096 and is the one you'll have best performances with. Use lower if you want to use Burst Bulk Alloc.
-#define TX_QUEUE_SZ 256			// Unused, you don't tx packets
-#define PKT_BURST_SZ 4096		// The max size of batch of packets retreived when invoking the receive function. Use the RX_QUEUE_SZ for high speed
-
-#define STDEV_THRESH 1		        // define the threshold for calculating the stdev in millisecs. Samples higher than STDEV_THRESH will be ignored..
-#define STAT_FILE "tstat-stats/stats00.txt"		// define the file statistics are put in. Every instance has got statsX.txt file
 
 /* Global vars */
 /* System vars */
@@ -38,9 +9,11 @@ static int nb_sys_ports;
 static int nb_sys_cores;
 static int nb_istance;
 static int current_core;
-/* Use the next 2 variables to set up port direction */
-static struct port_dir port_directions [] = {};
-static uint8_t nb_port_directions = 0;
+static int port_to_direction [MAX_PORTS]; 	/* This array indicates for each port, its direction.
+							0: No direction is set
+							2: Outgoing
+							3: Incoming
+						*/
 /* Data structs of the system*/
 static struct rte_ring    * intermediate_ring;
 static struct rte_mempool * pktmbuf_pool [MAX_QUEUES];
@@ -360,7 +333,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* Pass to tstat and take time before and after */
 		time = rte_get_tsc_cycles();
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), 0);
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
 
@@ -437,7 +410,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* If not debugging, just analyze the packets */
 		#else
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), 0);
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		#endif
 		
 		
@@ -514,18 +487,22 @@ static void init_port(int i) {
 		/* Decide seed to give the port, by default use the classical symmetrical*/
 		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
 		port_conf_temp = port_conf;
+		/* By default the port is neither incoming nor outgoing */
+		port_to_direction[i] = 0;
 		for (j=0; j < nb_port_directions; j++){
 			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
 			
 			/* If the port is outgoing, load balancing by ip source.*/
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out) {
 				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_src_ip;
+				port_to_direction[i] = 2;
 				printf("\t\tPort detected as outgoing. Load balancing by ip source.\n");
 			}
 
 			/* If the port is incoming, load balancing by ip destination.*/		
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  !port_directions[j].is_out) {
 				port_conf_temp.rx_adv_conf.rss_conf.rss_key = rss_seed_dst_ip;
+				port_to_direction[i] = 3;
 				printf("\t\tPort detected as incoming. Load balancing by ip destination.\n");
 			}	
 		}

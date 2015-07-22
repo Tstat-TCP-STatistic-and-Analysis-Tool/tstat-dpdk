@@ -108,6 +108,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <p>As previously pointed out, the DPDK wrapper acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with <code>$TSTATDPDK</code>.</p>
 
+
+
 <h2 id="221-installing-last-version-of-tstat">2.2.1 <a></a>Installing last version of Tstat</h2>
 
 <p>In this step you need to download and install the latest Tstat version from the official SVN repository, compile it, and install <code>libtstat</code></p>
@@ -159,6 +161,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <p><strong>Note:</strong> To simplity the setup, all the steps can be automatically performed using the script <code>$TSTATDPDK/tstat-dpdk/scripts/configure_machine.sh</code>. <br>
 Please verify that the script is doing the right operation for your system.</p>
+
+
 
 <h2 id="31-reserve-a-large-number-of-hugepages-to-dpdk">3.1 <a></a>Reserve a large number of hugepages to DPDK</h2>
 
@@ -236,6 +240,8 @@ So we suggest to disable it by means of this command:</p>
 <p>For instance, in <code>$TSTATDPDK/tstat-dpdk/tstat-conf</code> we provide a set of example configuration files (<code>tstat00.conf</code>, <code>tstat01.conf</code>, etc.) which include all Tstat plugins and log files, RRDTool output stats and. Fell free to configure the software as you like. <br>
 For more information please refer to the <a href="http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library">Tstat HOWTO</a></p>
 
+
+
 <h1 id="4-run-tstat-dpdk">4. <a></a>Run Tstat-DPDK</h1>
 
 <p><strong>Note:</strong> if, when running Tstat-DPDK, you encounter an error like this</p>
@@ -275,6 +281,8 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 <p>Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.</p>
 
 <p>Below you have an example of this output</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs http"><span class="hljs-attribute">Instance</span>: <span class="hljs-string">0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%</span>
 <span class="hljs-attribute">Instance</span>: <span class="hljs-string">1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%</span></code></pre>
@@ -319,12 +327,14 @@ If you want to ovverride this setting you can use the <code>-s &lt;logdir&gt;</c
 
 <p>RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the <code>-r &lt;rrd_dir&gt;</code> option (recall that each instance must have its different database in different directories).</p>
 
+
+
 <h2 id="44-system-performance-logs">4.4 <a></a>System Performance Logs</h2>
 
 <p>In the directory <code>$TSTATDPDK/tstat-dpdk/tstat-stats</code> there is a set of file called <code>statsXX.txt</code>. <br>
 Each instance writes in its own file (the <code>XX</code> in the name of the file is its number) statistics while it is running.</p>
 
-<p>This kind of output can be disabled by editing the source code – 5th line of <code>src/main_scheduler_multi_pool_auto_start.c</code> and commenting the <code>#define DEBUG</code> statement.</p>
+<p>This kind of output can be disabled by editing the source code – 5th line of <code>src/tstat-dpdk-params.h</code> and commenting the <code>#define DEBUG</code> statement.</p>
 
 <h2 id="45-advanced-load-balancing">4.5 <a></a>Advanced load balancing</h2>
 
@@ -344,13 +354,15 @@ Since it might be useful to have <strong>the traffic of the same local network h
 
 <p>To perform this action you have to modify few lines in the source code and then recompile as follows:</p>
 
-<p><strong>1.</strong> In <code>$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c</code> file, find these lines</p>
+<p><strong>1.</strong> In <code>$TSTATDPDK/tstat-dpdk/src/tstat-dpdk-params.h</code> file, find these lines</p>
 
 <pre class="prettyprint"><code class=" hljs cs">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
     <span class="hljs-keyword">static</span> <span class="hljs-keyword">struct</span> port_dir port_directions [] = {};
     <span class="hljs-keyword">static</span> uint8_t nb_port_directions = <span class="hljs-number">0</span>;</code></pre>
 
 <p><strong>2.</strong> Modify them to respect your network configuration, like in this example:</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs avrasm">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
     static struct port_dir port_directions [] = {
@@ -361,5 +373,5 @@ Since it might be useful to have <strong>the traffic of the same local network h
 
 <p>Where each entry in <code>port_directions</code> array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.</p>
 
-<p><strong>3.</strong> Recompile the loadbalancer just typing <code>make</code> in <code>$TSTATDPDK/tstat-dpdk/</code> folder.</p></div></body>
+<p><strong>3.</strong> Recompile the loadbalancer just typing <code>make clean &amp;&amp; make</code> in <code>$TSTATDPDK/tstat-dpdk/</code> folder.</p></div></body>
 </html>

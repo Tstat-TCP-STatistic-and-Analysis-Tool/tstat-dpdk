@@ -271,7 +271,7 @@ RRD database directory is specified in the configuration files of Tstat, so you 
 In the directory `$TSTATDPDK/tstat-dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
 Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
 
-This kind of output can be disabled by editing the source code -- 5th line of `src/main_scheduler_multi_pool_auto_start.c` and commenting the `#define DEBUG` statement.
+This kind of output can be disabled by editing the source code -- 5th line of `src/tstat-dpdk-params.h` and commenting the `#define DEBUG` statement.
 
 ## 4.5 <a name="load-balance"></a>Advanced load balancing
 It is possible to configure the load balancing rule to optimize particular network setups.
@@ -288,7 +288,7 @@ Since it might be useful to have **the traffic of the same local network host to
 
 To perform this action you have to modify few lines in the source code and then recompile as follows:
 
-**1.** In `$TSTATDPDK/tstat-dpdk/src/main_scheduler_multi_pool_auto_start.c` file, find these lines
+**1.** In `$TSTATDPDK/tstat-dpdk/src/tstat-dpdk-params.h` file, find these lines
 
 ```
 	/* Use the next 2 variables to set up port direction */
@@ -308,4 +308,5 @@ To perform this action you have to modify few lines in the source code and then 
 
 Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
 
-**3.** Recompile the loadbalancer just typing `make` in `$TSTATDPDK/tstat-dpdk/` folder.
+**3.** Recompile the loadbalancer just typing `make clean && make` in `$TSTATDPDK/tstat-dpdk/` folder.
+

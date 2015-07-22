@@ -14,7 +14,7 @@ LDLIBS = -ltstat -lpcap -lpthread -lm
 APP = tstat_dpdk
 
 # all source are stored in SRCS-y
-SRCS-y := src/main_scheduler_multi_pool_auto_start.c
+SRCS-y := src/tstat-dpdk-main.c
 #SRCS-y := src/main_copy.c
 
 CFLAGS += -O3

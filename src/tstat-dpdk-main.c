@@ -167,11 +167,11 @@ static void set_scheduling_policy_and_affinity(void){
 	cpu_set_name[11] += nb_istance%10;		
 	sprintf(dir_command, "mkdir -p /dev/cpuset/%s", cpu_set_name);							/* Create the command to create the cpu set ...*/
 	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpus", current_core, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", current_core, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
 	system(dir_command);													/* ... And execute it */	
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/mems", rte_socket_id(), cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", rte_socket_id(), cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
 	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/sched_load_balance; /bin/echo 1 > /dev/cpuset/cpu_exclusive; ");/* Create the command to set random parameters needed by cpuset to work with SCHED_DEADLINE*/
+	sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/cpuset.sched_load_balance; /bin/echo 1 > /dev/cpuset/cpuset.cpu_exclusive; ");/* Create the command to set random parameters needed by cpuset to work with SCHED_DEADLINE*/
 	system(dir_command);													/* ... And execute it */
 	sprintf(dir_command, "/bin/echo %ld > /dev/cpuset/%s/tasks", syscall(SYS_gettid), cpu_set_name);		/* Create command to put current thread in cpuset... */
 	system(dir_command);													/* ... And execute it */

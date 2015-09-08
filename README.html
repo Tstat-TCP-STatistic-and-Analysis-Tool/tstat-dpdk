@@ -118,14 +118,13 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/trunk/
     <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/trunk
+    sed -i <span class="hljs-string">'s/#DEFINES += -DRRD_THREADED/DEFINES += -DRRD_THREADED/g'</span> tstat/Makefile.conf
     ./autogen.sh
     ./configure --enable-libtstat
     make
     <span class="hljs-built_in">sudo</span> make install</code></pre>
 
 <p><strong><em>Note:</em></strong> <code>configure</code> should print the following message is the set up is correct.</p>
-
-
 
 <pre class="prettyprint"><code class=" hljs haml">[...]
 -<span class="ruby">------------------------------------------------
@@ -256,7 +255,7 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-keyword">export</span> LD_LIBRARY_PATH=/usr/local/lib</code></pre>
 
-
+<p>Sometimes it’s necessary to make the changes permanent by running <code>ldconfig</code> command, but this is dependent on your setup (e.g. you are using a remote terminal via <code>ssh</code>)</p>
 
 <h2 id="41-start-tstat-instances">4.1 <a></a>Start Tstat instances</h2>
 
@@ -336,6 +335,8 @@ Each instance writes in its own file (the <code>XX</code> in the name of the fil
 
 <p>This kind of output can be disabled by editing the source code – 5th line of <code>src/tstat-dpdk-params.h</code> and commenting the <code>#define DEBUG</code> statement.</p>
 
+
+
 <h2 id="45-advanced-load-balancing">4.5 <a></a>Advanced load balancing</h2>
 
 <p>It is possible to configure the load balancing rule to optimize particular network setups.</p>
@@ -355,6 +356,8 @@ Since it might be useful to have <strong>the traffic of the same local network h
 <p>To perform this action you have to modify few lines in the source code and then recompile as follows:</p>
 
 <p><strong>1.</strong> In <code>$TSTATDPDK/tstat-dpdk/src/tstat-dpdk-params.h</code> file, find these lines</p>
+
+
 
 <pre class="prettyprint"><code class=" hljs cs">    <span class="hljs-comment">/* Use the next 2 variables to set up port direction */</span>
     <span class="hljs-keyword">static</span> <span class="hljs-keyword">struct</span> port_dir port_directions [] = {};

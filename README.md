@@ -93,6 +93,7 @@ In this step you need to download and install the latest Tstat version from the 
 ```bash
 	svn co http://tstat.polito.it/svn/software/tstat/trunk/
 	cd $TSTATDPDK/trunk
+	sed -i 's/#DEFINES += -DRRD_THREADED/DEFINES += -DRRD_THREADED/g' tstat/Makefile.conf
 	./autogen.sh
 	./configure --enable-libtstat
 	make
@@ -205,7 +206,7 @@ make sure the environment  finds `libtstat`  shared object by running:
     export LD_LIBRARY_PATH=/usr/local/lib
 ```
 
-
+Sometimes it's necessary to make the changes permanent by running `ldconfig` command, but this is dependent on your setup (e.g. you are using a remote terminal via `ssh`)
 
 ## 4.1 <a name="start"></a>Start Tstat instances
 

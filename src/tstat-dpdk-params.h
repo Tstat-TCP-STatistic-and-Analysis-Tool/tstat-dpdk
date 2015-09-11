@@ -2,10 +2,15 @@
 
 /* If you define DEBUG, stats will be printed */
 #define DEBUG
+
 /* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
 //#define DEBUG_DEADLINE
+
 /* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
 //#define SUM_IP
+
+/* If you define OFFLOAD_CPU, tstat-dpdk will stop polling for the packets in low traffic conditions */
+//#define OFFLOAD_CPU
 
 /* Constants of the system */
 #define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
@@ -14,6 +19,7 @@
 #define SCHED_RUNTIME_NS     (   1000*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
 #define SCHED_TOTALTIME_NS   ( 2*1000*1000)			//					period time:	2000 us
 #define CPU_SET_NAME "tstat-dpdk00"
+#define SLEEP_TIME_US 1000					// The time (in us) the consumer thread sleeps when finding empty buffer, if you enable OFFLOAD_CPU
 
 #define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
 #define MEMPOOL_ELEM_NB (524288-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
@@ -35,8 +41,8 @@
 /* Use the next 2 variables to set up port direction, e.g. 
 
 	static struct port_dir port_directions [] = {
-		{ .pci_address = "01:00.0", .is_out=0 },
-		{ .pci_address = "01:00.1", .is_out=1 },
+		{ .pci_address = "02:00.1", .is_out=0 },
+		{ .pci_address = "02:00.0", .is_out=1 },
 	};
 	static uint8_t nb_port_directions = 2;
 */

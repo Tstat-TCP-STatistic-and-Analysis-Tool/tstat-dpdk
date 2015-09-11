@@ -322,7 +322,14 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		ret = rte_ring_dequeue(intermediate_ring, (void**)&m);
 		
 		/* Continue polling if no packet available */
-		if( unlikely (ret != 0)) continue;
+		if( unlikely (ret != 0)) {
+
+			/* If there is no packet, freeze the thread for SLEEP_TIME_US microseconds */
+			#ifdef OFFLOAD_CPU
+				usleep(SLEEP_TIME_US);
+			#endif //OFFLOAD_CPU
+			continue;
+		}
 
 		/* Read timestamp of the packet from unused fields of mbuf structure*/
 		tv.tv_usec = m->udata64;

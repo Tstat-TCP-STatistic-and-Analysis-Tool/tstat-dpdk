@@ -2,15 +2,12 @@
 
 /* If you define DEBUG, stats will be printed */
 #define DEBUG
-
 /* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
 //#define DEBUG_DEADLINE
-
 /* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
 //#define SUM_IP
-
 /* If you define OFFLOAD_CPU, tstat-dpdk will stop polling for the packets in low traffic conditions */
-//#define OFFLOAD_CPU
+#define OFFLOAD_CPU
 
 /* Constants of the system */
 #define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
@@ -38,14 +35,14 @@
 #define STDEV_THRESH 1		       				// define the threshold for calculating the stdev in millisecs. Samples higher than STDEV_THRESH will be ignored..
 #define STAT_FILE "tstat-stats/stats00.txt"			// define the file statistics are put in. Every instance has got statsX.txt file
 
-/* Use the next 2 variables to set up port direction, e.g. 
+/* Use the next 2 variables to set up port direction, e.g.
 
 	static struct port_dir port_directions [] = {
 		{ .pci_address = "02:00.1", .is_out=0 },
 		{ .pci_address = "02:00.0", .is_out=1 },
 	};
-	static uint8_t nb_port_directions = 2;
-*/
+	static uint8_t nb_port_directions = 2;*/
+
 
 static struct port_dir port_directions [] = {};
 static uint8_t nb_port_directions = 0;
@@ -67,17 +64,19 @@ uint8_t rss_seed_alternative [] = {	0x6d, 0x5a, 0x6d, 0x5b, 0x6d, 0x5a, 0x6d, 0x
 /* This seed is to load balance only respect destination IP, according to me (Martino Trevisan, from nowhere particular) */
 uint8_t rss_seed_dst_ip [] = { 	
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 /* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
 uint8_t rss_seed_src_ip [] = { 	
-			0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
+
+
 

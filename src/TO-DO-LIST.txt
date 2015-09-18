@@ -4,7 +4,9 @@ Middle term work:
 
 3 [DONE]. Customize load-balancing rules.
 4 [DONE]. Changeable log files directories
-5 [DONE]. Check full compatibility with Tstat 3.0 (RRD, directories, constants, DNHunter)
+5 [DONE]. Check full compatibility with Tstat 3.0 (RRD, directories, constants, DNHunter)Ti
+6. Print time in statistics output
+7. Redirect warning on stderr
 
 Martino Trevisan,
 1/7/2015

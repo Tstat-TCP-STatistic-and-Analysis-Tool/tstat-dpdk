@@ -113,9 +113,10 @@ In this step you need to download and install the latest Tstat version from the 
     - zlib      no
     - rrd       yes
     - libtstat  yes
+    - rrdthread yes
 --------------------------------------------------
 ```
-This indicates both `libpcap` and `rrdtool` libraries have been correctly found and Tstat will be compiled as a library.
+This indicates both `libpcap` and `rrdtool` libraries have been correctly found and Tstat will be compiled as a library with rrdthread feature active.
 
 ## 2.2.2 <a name="comp-dpdk-cluster"></a>Installing the DPDK Load Balancer
 ```bash

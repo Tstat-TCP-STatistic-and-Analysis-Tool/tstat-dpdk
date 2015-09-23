@@ -118,9 +118,8 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 
 <pre class="prettyprint"><code class="language-bash hljs ">    svn co http://tstat.polito.it/svn/software/tstat/trunk/
     <span class="hljs-built_in">cd</span> <span class="hljs-variable">$TSTATDPDK</span>/trunk
-    sed -i <span class="hljs-string">'s/#DEFINES += -DRRD_THREADED/DEFINES += -DRRD_THREADED/g'</span> tstat/Makefile.conf
     ./autogen.sh
-    ./configure --enable-libtstat
+    ./configure --enable-libtstat --enable-rrdthread
     make
     <span class="hljs-built_in">sudo</span> make install</code></pre>
 
@@ -256,6 +255,8 @@ For more information please refer to the <a href="http://tstat.tlc.polito.it/HOW
 <pre class="prettyprint"><code class="language-bash hljs ">    <span class="hljs-keyword">export</span> LD_LIBRARY_PATH=/usr/local/lib</code></pre>
 
 <p>Sometimes it’s necessary to make the changes permanent by running <code>ldconfig</code> command, but this is dependent on your setup (e.g. you are using a remote terminal via <code>ssh</code>)</p>
+
+
 
 <h2 id="41-start-tstat-instances">4.1 <a></a>Start Tstat instances</h2>
 

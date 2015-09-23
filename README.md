@@ -93,9 +93,8 @@ In this step you need to download and install the latest Tstat version from the 
 ```bash
 	svn co http://tstat.polito.it/svn/software/tstat/trunk/
 	cd $TSTATDPDK/trunk
-	sed -i 's/#DEFINES += -DRRD_THREADED/DEFINES += -DRRD_THREADED/g' tstat/Makefile.conf
 	./autogen.sh
-	./configure --enable-libtstat
+	./configure --enable-libtstat --enable-rrdthread
 	make
 	sudo make install
 ```
@@ -310,4 +309,3 @@ To perform this action you have to modify few lines in the source code and then 
 Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
 
 **3.** Recompile the loadbalancer just typing `make clean && make` in `$TSTATDPDK/tstat-dpdk/` folder.
-

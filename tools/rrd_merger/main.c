@@ -61,11 +61,13 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes);
 int main(int argc, char *argv[])
 {
     
+    //Parse arguments to get working directories
     parse_args(argc, argv);
 
     //Build files index on first input directory
     create_metadata(indir[0]);
 
+    //Perform the merge
     update_rrd();
 
     return(0);

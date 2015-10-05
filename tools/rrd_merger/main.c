@@ -16,14 +16,15 @@
 #define MAX_IDX 100
 #define MAX_PRC 100
 #define MAX_MEASUREMENT 1000
-#define DEBUG 2
-#define STEP_TIME 300
 #define N_RRA 4
 #define HISTO 1
 #define MIN 2
 #define MAX 3
 
+//Debeug level
+#define DEBUG 2
 
+//Struct wrapping files data
 typedef struct s_measurement{
     char name [MAX_NAME];
     int min;
@@ -37,6 +38,7 @@ typedef struct s_measurement{
     int num_prc;
 }measurement;
 
+//Static variables
 char outdir [DIR_LENGTH];
 char indir [MAX_DIRS][DIR_LENGTH];
 int n_dir = 0;
@@ -45,10 +47,9 @@ int n_meas=0;
 
 // Prototypes
 void parse_args (int argc, char *argv[]);
-void create_data (char * directory);
 void parse_file (char * name );
 int  create_new_measure(char *);
-void create_data(char * directory);
+void create_metadata(char * directory);
 void update_rrd(void);
 void update_rrd_file(char * name, int type);
 void sum_rras(xmlNodePtr * nodes, int n_nodes);
@@ -59,10 +60,11 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes);
 
 int main(int argc, char *argv[])
 {
-
+    
     parse_args(argc, argv);
 
-    create_data(indir[0]);
+    //Build files index on first input directory
+    create_metadata(indir[0]);
 
     update_rrd();
 
@@ -73,17 +75,19 @@ void parse_args(int argc, char *argv[]){
 
     int i;
 
-    //Fetch arguments
+    //Wrong arguments
     if (argc < 4){
         printf("Wrong arguments: usage rrd_merger outdir indir1 indir2 ...\n");
         exit(1);
     }
 
+    //Copy arguments
     strcpy(outdir, argv[1]);
     n_dir=argc-2;
     for (i=2; i<argc; i++)
         strcpy(indir[i-2], argv[i]);
 
+    //Output directories
     if (DEBUG > 0){
         printf("Output directory: %s\n", outdir);
         printf("Input directories: ");
@@ -91,20 +95,21 @@ void parse_args(int argc, char *argv[]){
             printf("%s ", indir[i]);
         printf("\n");
     }
+
     return;
 
 }
 
-void create_data(char * directory){
+void create_metadata(char * directory){
     DIR *dir;
     struct dirent *ent;
 
     if ((dir = opendir (directory)) != NULL) {
 
-        /* Parse all the files*/
+        //For each file in the directory
         while ((ent = readdir (dir)) != NULL) {
 
-            // SKip ".." and "."
+            // Skip ".." and "."
             if ( strcmp(ent->d_name,".")==0 || strcmp(ent->d_name,"..")==0 )
                 continue;
 
@@ -146,10 +151,12 @@ void parse_file(char * file_name ){
             i=n_meas;
             }
     }
-
+    
+    // Create entry if it doesn't exists
     if (meas_index==-1)
         meas_index = create_new_measure(name);
 
+    // Detect measurement type associated to this file
     if (strcmp(type, "min")==0){
         meas[meas_index].min=1;
     }
@@ -178,6 +185,7 @@ void parse_file(char * file_name ){
 
 }
 
+// Create new entry in measurements vector
 int create_new_measure(char * name){
 
     memset(&meas[n_meas],0,sizeof(measurement));
@@ -195,6 +203,7 @@ void update_rrd(void){
     //Create directory if doesn't exists
     mkdir(outdir, 0777);
 
+    //Executing correct merge operation according to measurement type
     for (i=0; i<n_meas; i++){
         if (meas[i].min){
             sprintf(name, "%s.min", meas[i].name);
@@ -242,6 +251,8 @@ void update_rrd_file(char * name, int type){
     xmlDocPtr trees [MAX_DIRS];
     xmlNodePtr rras [MAX_DIRS];
 
+    //Convert in xml each input file
+    //The merge is performed using the first input file as a template.
     for (i=0;i<n_dir;i++){
 
         //Open xml data
@@ -260,11 +271,11 @@ void update_rrd_file(char * name, int type){
 
     }
 
-    // Get first RRA of each file
+    // Get first RRA (measurement block) of each file
     for (i=0;i<n_dir;i++)
         for(rras[i]=xmlDocGetRootElement(trees[i])->children;strcmp((char*)rras[i]->name, "rra")!=0; rras[i]=rras[i]->next){}
 
-    // Merge every RRA
+    // Merge every RRA (measurement block) according to measurement type. The merge is performed using the first input file as a template.
     for (i=0;i<N_RRA;i++){
 
         if (type == HISTO)
@@ -274,7 +285,7 @@ void update_rrd_file(char * name, int type){
         else if (type == MAX)
             max_rras(rras, n_dir);
 
-        // Go on with RRAs of each file
+        // Pass to next RRAs (measurement blocks) of each file
         for(j=0; j< n_dir; j++){
             rras[j]=rras[j]->next;
             while ( rras[j] != NULL && strcmp((char*)rras[j]->name, "rra")!=0 ){ rras[j]=rras[j]->next;}
@@ -282,15 +293,13 @@ void update_rrd_file(char * name, int type){
 
     }
 
-    // Xml output
+    // Create XML output
     sprintf(file_out, "%s/%s.xml",  outdir, name);
-
     xmlSaveFileEnc(file_out, trees[0], "UTF-8");
-
     for (i=0; i< n_dir; i++)
         xmlFreeDoc(trees[i]);
 
-    // Convert it to RRD format
+    // Convert it to RRD format and remove XML file
     sprintf(command, "rrdtool restore %s/%s.xml %s/%s.rrd -f",  outdir, name,  outdir, name);
     system (command);
     remove(file_out);
@@ -369,7 +378,7 @@ void min_rras(xmlNodePtr * nodes, int n_nodes){
 
         min = DBL_MAX;
 
-        // Calculate the sum
+        // Calculate the min
         for (i = 0; i < n_nodes; i++){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
@@ -418,7 +427,7 @@ void max_rras(xmlNodePtr * nodes, int n_nodes){
 
         max = DBL_MIN;
 
-        // Calculate the sum
+        // Calculate the max
         for (i = 0; i < n_nodes; i++){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
@@ -493,5 +502,4 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes){
 
 
 }
-
 

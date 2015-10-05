@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
-//create temp_rrd.file --step 300s --start  rrd.time_update - 10 DS:<name>:GAUGE:600:U:U RRA_DAILY  RRA_WEEKLY  RRA_MONTHLY  RRA_YEARLY
 
 //Program constants
 #define DIR_LENGTH 1000
@@ -24,12 +23,6 @@
 #define MIN 2
 #define MAX 3
 
-
-//RRD TOOL DEFINES
-#define RRA_DAILY   "RRA:AVERAGE:0.5:1:600"
-#define RRA_WEEKLY  "RRA:AVERAGE:0.5:6:700"
-#define RRA_MONTHLY "RRA:AVERAGE:0.5:24:775"
-#define RRA_YEARLY  "RRA:AVERAGE:0.5:288:797"
 
 typedef struct s_measurement{
     char name [MAX_NAME];
@@ -239,8 +232,6 @@ void update_rrd(void){
     }
 
 }
-
-
 
 
 void update_rrd_file(char * name, int type){
@@ -502,4 +493,5 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes){
 
 
 }
+
 

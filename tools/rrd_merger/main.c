@@ -21,8 +21,11 @@
 #define MIN 2
 #define MAX 3
 
-//Debeug level
-#define DEBUG 2
+//Debug level
+#define DEBUG 1
+
+//Uncomment next line to merge min and max
+//#define MIN_MAX
 
 //Struct wrapping files data
 typedef struct s_measurement{
@@ -61,6 +64,9 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes);
 int main(int argc, char *argv[])
 {
     
+    if (DEBUG > 0)
+        printf("Started RRD_Merger\n");
+
     //Parse arguments to get working directories
     parse_args(argc, argv);
 
@@ -208,16 +214,20 @@ void update_rrd(void){
     //Executing correct merge operation according to measurement type
     for (i=0; i<n_meas; i++){
         if (meas[i].min){
+            #ifdef MIN_MAX
             sprintf(name, "%s.min", meas[i].name);
             if (DEBUG > 1)
                 printf("Updating file: %s.rrd\n", name);
             update_rrd_file(name, MIN);
+            #endif //MIN_MAX
         }
         if (meas[i].max){
+            #ifdef MIN_MAX
             sprintf(name, "%s.max", meas[i].name);
             if (DEBUG > 1)
                 printf("Updating file: %s.rrd\n", name);
             update_rrd_file(name, MAX);
+            #endif //MIN_MAX
         }
         if (meas[i].avg){
         }

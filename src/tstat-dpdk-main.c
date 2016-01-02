@@ -344,7 +344,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* Pass to tstat and take time before and after */
 		time = rte_get_tsc_cycles();
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) -1 , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
 
@@ -421,7 +421,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* If not debugging, just analyze the packets */
 		#else
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) -1 , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		#endif
 		
 		

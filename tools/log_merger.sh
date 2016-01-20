@@ -10,7 +10,7 @@
 # 1. Process log files older than the guard time (in minutes)
 time_guard_minutes=60
 # 2. Delete merged directories
-delete_merged=false
+delete_merged=true
 # 3. Debug level
 debug=1
 # 4. Log merging algorithm: can be <end> (sort by flow ending time), <start> (sort by flow starting time), <concat> (concatenate the files)
@@ -353,7 +353,13 @@ for dir1 in $(ls $first_input); do
 			if [ "$debug" -gt "0" ]; then
 				echo "   Removing ${dir_to_process[$indir]}"
 			fi
-			rm -rf ${dir_to_process[$indir]}
+			# Avoid unsafe deletes
+			if [[ ${dir_to_process[$indir]} =~ .*/[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2}.out ]]; then
+				rm -rf ${dir_to_process[$indir]}
+			else
+				echo "Something went wrong when deleting. Quitting..."
+				exit
+			fi
 		done
 	fi
 

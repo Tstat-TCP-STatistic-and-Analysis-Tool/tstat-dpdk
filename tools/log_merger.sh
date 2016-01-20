@@ -1,7 +1,7 @@
 #!/bin/bash
 # ABOUT
 # This script merges TSTAT log files in the specified directories.
-# It is possible to configure the meging algorithms (by starting time, ending time or concatenation).
+# It is possible to configure the merging algorithms (by starting time, ending time or concatenation).
 # It sorts all the log files in the specified directories, except for the current one ( the one with mod. time less than 60 min).
 # After the merging, the old logs can be deleted (this configurable).
 # Usage: log_merger.sh <out_dir> <in_dir1> <in_dir2> ... <in_dirN> 

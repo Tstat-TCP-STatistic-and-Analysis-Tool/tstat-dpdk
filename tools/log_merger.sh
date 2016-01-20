@@ -214,17 +214,17 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_http_complete"
 	done
 	# Print 1 header 
-	head -1 "$first_input/$dir1/log_http_complete" > "${output_dir}/${dir1}/log_http_complete"
+	head -2 "$first_input/$dir1/log_http_complete" > "${output_dir}/${dir1}/log_http_complete"
 	# Concat the files
 	if [ $http_complete = "start" ] ; then 
-		tail -q -n+2 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
 	fi
 	if [ $http_complete = "end" ] ; then
 		echo "      Not supported merging log_http_complete by end time. Using start time"
-		tail -q -n+2 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
 	fi
 	if [ $http_complete = "concat" ] ; then 
-		tail -q -n+2 $files >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files >> "${output_dir}/${dir1}/log_http_complete"
 	fi
 
 

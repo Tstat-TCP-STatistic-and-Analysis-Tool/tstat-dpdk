@@ -77,7 +77,7 @@ static struct rte_eth_conf port_conf = {
 	.rx_adv_conf = {
 		.rss_conf = {
 			.rss_key_len = 40,				/* and the seed length.					*/
-			.rss_hf = (ETH_RSS_IPV4_TCP | ETH_RSS_UDP) ,	/* Set the mask of protocols RSS will be applied to 	*/
+			.rss_hf = (ETH_RSS_NONFRAG_IPV4_TCP | ETH_RSS_NONFRAG_IPV4_UDP) ,	/* Set the mask of protocols RSS will be applied to 	*/
 		}	
 	}
 };
@@ -100,7 +100,7 @@ static const struct rte_eth_txconf tx_conf = {
 		.wthresh = 0,   /* Ring writeback threshold */
 	},
 	.tx_free_thresh = 0,    /* Use PMD default values */
-	.txq_flags = ETH_TXQ_FLAGS_NOOFFLOADS | ETH_TXQ_FLAGS_NOMULTSEGS,  /* IMPORTANT for vmxnet3, otherwise it won't work */
+	.offloads = 0,  /* IMPORTANT for vmxnet3, otherwise it won't work */
 	.tx_rs_thresh = 0,      /* Use PMD default values */
 };
 

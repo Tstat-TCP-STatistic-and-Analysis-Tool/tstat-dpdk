@@ -58,9 +58,9 @@ int main(int argc, char **argv)
 	argv += ret;
 
 	/* Make standard output more silent */
-	rte_set_log_level 	( RTE_LOG_EMERG );
-	rte_set_log_type (RTE_LOGTYPE_EAL, 0);
-	rte_set_log_type (RTE_LOGTYPE_PMD, 0);
+	rte_log_set_global_level ( RTE_LOG_EMERG );
+	rte_log_set_level (RTE_LOGTYPE_EAL, 0);
+	rte_log_set_level (RTE_LOGTYPE_PMD, 0);
 	rte_openlog_stream(fopen("/dev/null", "w"));
 
 	/* Check if this application can use one core*/
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 		for (i = 0; i < nb_sys_cores; i++){
 			sprintf( pool_name, MEMPOOL_NAME "%2d", i);
 			pktmbuf_pool[i] = rte_mempool_create(pool_name, MEMPOOL_ELEM_NB, MEMPOOL_ELEM_SZ, MEMPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,  rte_lcore_to_socket_id  (i), 0);
-			if (pktmbuf_pool[i] == NULL) FATAL_ERROR("Cannot create cluster_mem_pool %d. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_TAILQ: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", i, rte_errno, ENOMEM, ENOSPC, E_RTE_NO_TAILQ, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
+			if (pktmbuf_pool[i] == NULL) FATAL_ERROR("Cannot create cluster_mem_pool %d. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", i, rte_errno, ENOMEM, ENOSPC, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
 			
 		}
 		/* Operations needed for each ethernet device */			
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 
 	/* Start next instance of cluster */
 	if (nb_istance < nb_sys_cores - 1){
-		sprintf(command, "sudo %s -c 0X%04x -n %d --proc-type=secondary -- -m %d -p %d &", argv[0], (int)pow(2,nb_istance+1), rte_memory_get_nchannel() ,nb_sys_cores, nb_istance+1);
+		sprintf(command, "%s -c 0X%04x -n %d --proc-type=secondary -- -m %d -p %d &", argv[0], (int)pow(2,nb_istance+1), rte_memory_get_nchannel() ,nb_sys_cores, nb_istance+1);
 		printf("Starting instance %d...\nExecuting '%s'\n", nb_istance+2, command);	
 		system(command);
 	}
@@ -166,14 +166,19 @@ static void set_scheduling_policy_and_affinity(void){
 	cpu_set_name[10] += nb_istance/10;										/* Set name of new cpuset */
 	cpu_set_name[11] += nb_istance%10;		
 	sprintf(dir_command, "mkdir -p /dev/cpuset/%s", cpu_set_name);							/* Create the command to create the cpu set ...*/
+	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */
 	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", current_core, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
+	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */	
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", rte_socket_id(), cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", 0, cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
+	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */
 	sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/cpuset.sched_load_balance; /bin/echo 1 > /dev/cpuset/cpuset.cpu_exclusive; ");/* Create the command to set random parameters needed by cpuset to work with SCHED_DEADLINE*/
+	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */
 	sprintf(dir_command, "/bin/echo %ld > /dev/cpuset/%s/tasks", syscall(SYS_gettid), cpu_set_name);		/* Create command to put current thread in cpuset... */
+	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */
 
 	/* Set up SCHED_DEADLINE policy */
@@ -395,7 +400,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 			printf("Rate: %5.3fMpps ", (double)(local_nb_packets - old_nb_packets)/(time-old_time)*freq/1000000 );
 			printf("Loss: %5.3fMpps ", (double)(   local_nb_drop-old_nb_drop   +   nic_missed_pkts-old_nic_missed_pkts   )/(   time-old_time   )*freq/1000000 );
 			printf("Mem. occupation: %3.0f%% ", 100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100.0);
-			printf("(%3.0f%% in tot.) ", (float)rte_mempool_free_count(pktmbuf_pool[nb_istance])/MEMPOOL_ELEM_NB*100.0);		
+			printf("(%3.0f%% in tot.) ", (float)rte_mempool_in_use_count(pktmbuf_pool[nb_istance])/MEMPOOL_ELEM_NB*100.0);		
 
 	
 			/* If the NICs or the buffer are loosing packets, signal it */
@@ -453,7 +458,7 @@ static void sig_handler(int signo)
 				printf("\nPORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
 				for (j = 0; j < nb_sys_cores; j++){
 					/* Per port queue stats */
-					printf("\n\tQueue %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", j, stat.q_ipackets[j] ,stat.q_errors[j], stat.q_ipackets[j]+stat.q_errors[j], (float)stat.q_errors[j]/(stat.q_ipackets[j]+stat.q_errors[j])*100);
+					printf("\n\tQueue %d Rx: %ld Err: %ld Tot: %ld", j, stat.q_ipackets[j] ,stat.q_errors[j], stat.q_ipackets[j]+stat.q_errors[j]);
 				}			
 				
 			}
@@ -483,23 +488,25 @@ static void init_port(int i) {
 		int ret;
 		uint8_t rss_key [40];
 		char pci_address[10];
+        char port_address [RTE_ETH_NAME_MAX_LEN];
 		struct rte_eth_link link;
 		struct rte_eth_dev_info dev_info;
 		struct rte_eth_rss_conf rss_conf;
 		struct rte_eth_conf port_conf_temp;
-		struct rte_eth_fdir fdir_conf;
 
 		/* Retreiving and printing device infos */
 		rte_eth_dev_info_get(i, &dev_info);
-		printf("Name:%s\n\tDriver name: %s\n\tMax rx queues: %d\n\tMax tx queues: %d\n", dev_info.pci_dev->driver->name,dev_info.driver_name, dev_info.max_rx_queues, dev_info.max_tx_queues);
-		printf("\tPCI Adress: %04d:%02d:%02x.%01d\n", dev_info.pci_dev->addr.domain, dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+		printf("Name: %s\n\tDriver name: %s\n\tMax rx queues: %d\n\tMax tx queues: %d\n", dev_info.driver_name,dev_info.driver_name, dev_info.max_rx_queues, dev_info.max_tx_queues);
+        
+        rte_eth_dev_get_name_by_port(i, port_address);
+		printf("\tPCI Address: %s\n", port_address);
 		if (dev_info.max_rx_queues < nb_sys_cores) FATAL_ERROR("Every interface must have a queue on each core, but this is not supported. Quitting...\n");
 
 		/* Decide the seed to give the port, by default use the classical symmetrical*/
 		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
 		port_conf_temp = port_conf;
 		for (j=0; j < nb_port_directions; j++){
-			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+			strcpy (pci_address, port_address);
 			
 			/* If the port is outgoing, load balancing by ip source.*/
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out) {
@@ -513,6 +520,8 @@ static void init_port(int i) {
 				printf("\t\tPort detected as incoming. Load balancing by ip destination.\n");
 			}	
 		}
+
+
 		/* Configure device with 'nb_sys_cores' rx queues and 1 tx queue */
 		ret = rte_eth_dev_configure(i, nb_sys_cores, 1, &port_conf_temp);
 		if (ret < 0) rte_panic("Error configuring the port\n");
@@ -521,10 +530,12 @@ static void init_port(int i) {
 		for (j = 0; j < nb_sys_cores; j++){
 			/* Configure rx queue j of current device on current NUMA socket. It takes elements from the mempool */
 			ret = rte_eth_rx_queue_setup(i, j, RX_QUEUE_SZ,  rte_lcore_to_socket_id ( j ), &rx_conf, pktmbuf_pool[j]);
+
 			if (ret < 0) FATAL_ERROR("Error configuring receiving queue\n");
 			/* Configure mapping [queue] -> [element in stats array] */
 			ret = rte_eth_dev_set_rx_queue_stats_mapping 	(i, j, j );
-			if (ret < 0) FATAL_ERROR("Error configuring receiving queue stats\n");
+			if (ret < 0) printf("Error configuring receiving queue stats\n");
+
  	
 		}
 
@@ -552,9 +563,6 @@ static void init_port(int i) {
 		ret = rte_eth_dev_rss_hash_conf_get (i,&rss_conf);
 		if (ret == 0) printf("\tDevice supports RSS\n"); else printf("\tDevice DOES NOT support RSS\n");
 		
-		/* Print Flow director support */
-		ret = rte_eth_dev_fdir_get_infos (i, &fdir_conf);
-		if (ret == 0) printf("\tDevice supports Flow Director\n"); else printf("\tDevice DOES NOT support Flow Director\n"); 
 
 		/* Sperimental, try unbalanced queue distribution for RSS in order to mitigate asymmetrical speed of instance due to hypethreading 
 		#if RTE_VER_MAJOR == 1 && RTE_VER_MINOR < 8
@@ -592,7 +600,7 @@ static void init_port(int i) {
 static void create_port_to_direction_array(void){
 
 	int i, j;
-	char pci_address[10];
+	char pci_address[RTE_ETH_NAME_MAX_LEN];
 	struct rte_eth_dev_info dev_info;
 
 	/* For each port */
@@ -605,7 +613,8 @@ static void create_port_to_direction_array(void){
 		port_to_direction[i] = 0;
 
 		for (j=0; j < nb_port_directions; j++){
-			sprintf(pci_address, "%02d:%02x.%01d", dev_info.pci_dev->addr.bus, dev_info.pci_dev->addr.devid, dev_info.pci_dev->addr.function);
+
+	        rte_eth_dev_get_port_by_name(i, pci_address);
 			
 			/* If the port is outgoing, load balancing by ip source.*/
 			if ( strcmp(pci_address,port_directions[j].pci_address) == 0  &&  port_directions[j].is_out)

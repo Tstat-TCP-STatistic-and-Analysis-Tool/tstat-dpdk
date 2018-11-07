@@ -13,8 +13,8 @@
 #define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
 #define TSTAT_LOG_DIR "tstat-logs/tstat00.log"
 
-#define SCHED_RUNTIME_NS     (   1000*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
-#define SCHED_TOTALTIME_NS   ( 2*1000*1000)			//					period time:	2000 us
+#define SCHED_RUNTIME_NS     (   100*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
+#define SCHED_TOTALTIME_NS   ( 150*1000 )			//					period time:	2000 us
 #define CPU_SET_NAME "tstat-dpdk00"
 #define SLEEP_TIME_US 1000					// The time (in us) the consumer thread sleeps when finding empty buffer, if you enable OFFLOAD_CPU
 

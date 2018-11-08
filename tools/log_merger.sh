@@ -10,7 +10,7 @@
 # 1. Process log files older than the guard time (in minutes)
 time_guard_minutes=60
 # 2. Delete merged directories
-delete_merged=true
+delete_merged=false
 # 3. Debug level
 debug=1
 # 4. Log merging algorithm: can be <end> (sort by flow ending time), <start> (sort by flow starting time), <concat> (concatenate the files)
@@ -24,6 +24,11 @@ mm_complete="concat"
 skype_complete="concat"
 chat_complete="concat"
 messages_complet="concat"
+# 5. Create directory tree
+create_tree=true
+MONTHS=(ZERO Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
+# 6. Compress in gz files
+compress=true
 
 # CODE
 # Parse arguments
@@ -131,11 +136,19 @@ for dir1 in $(ls $first_input); do
 		continue
 	fi
 
+    # Create output tree if needed
+    output_tree=$dir1
+    if $create_tree ; then
+        year=$(echo $output_tree | cut -d "_" -f 1)
+        month=$(echo $output_tree | cut -d "_" -f 2)
+        month_str=${MONTHS[$month]}
+        new_output_tree=$year/${month}-${month_str}/$output_tree
+        output_tree=$new_output_tree
+    fi
+
 	# Now in dir_to_process there are the directories of the log files to merge
 	# Create outdir
-	mkdir -p "${output_dir}/${dir1}"
-
-
+	mkdir -p "${output_dir}/${output_tree}"
 
 	#1. Process log_tcp_complete
 	if [ "$debug" -gt "0" ]; then
@@ -146,18 +159,21 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_tcp_complete"
 	done
 	# Print 1 header 
-	head -1 "$first_input/$dir1/log_tcp_complete" > "${output_dir}/${dir1}/log_tcp_complete"
+	head -1 "$first_input/$dir1/log_tcp_complete" > "${output_dir}/${output_tree}/log_tcp_complete"
 	# Concat the files
 	if [ $tcp_complete = "start" ] ; then
-		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${dir1}/log_tcp_complete"
+		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${output_tree}/log_tcp_complete"
 	fi
 	if [ $tcp_complete = "end" ] ; then
-		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${dir1}/log_tcp_complete"
+		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${output_tree}/log_tcp_complete"
 	fi
 	if [ $tcp_complete = "concat" ] ; then
-		tail -q -n+2 $files >> "${output_dir}/${dir1}/log_tcp_complete"
+		tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_tcp_complete"
 	fi
-
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_tcp_complete" 2>/dev/null
+    fi
 
 
 	#2. Process log_tcp_nocomplete
@@ -169,17 +185,21 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_tcp_nocomplete"
 	done
 	# Print 1 header 
-	head -1 "$first_input/$dir1/log_tcp_nocomplete" > "${output_dir}/${dir1}/log_tcp_nocomplete"
+	head -1 "$first_input/$dir1/log_tcp_nocomplete" > "${output_dir}/${output_tree}/log_tcp_nocomplete"
 	# Concat the files
 	if [ $tcp_nocomplete = "start" ] ; then
-		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${dir1}/log_tcp_nocomplete"
+		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
 	fi
 	if [ $tcp_nocomplete = "end" ] ; then
-		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${dir1}/log_tcp_nocomplete"
+		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
 	fi
 	if [ $tcp_nocomplete = "concat" ] ; then
-		tail -q -n+2 $files >> "${output_dir}/${dir1}/log_tcp_nocomplete"
+		tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_tcp_nocomplete" 2>/dev/null
+    fi
 
 
 	#3. Process log_udp_complete
@@ -191,18 +211,23 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_udp_complete"
 	done
 	# Print 1 header 
-	head -1 "$first_input/$dir1/log_udp_complete" > "${output_dir}/${dir1}/log_udp_complete"
+	head -1 "$first_input/$dir1/log_udp_complete" > "${output_dir}/${output_tree}/log_udp_complete"
 	# Concat the files
 	if [ $udp_complete = "start" ] ; then 
-		tail -q -n+2 $files | sort -n -k3 >> "${output_dir}/${dir1}/log_udp_complete"
+		tail -q -n+2 $files | sort -n -k3 >> "${output_dir}/${output_tree}/log_udp_complete"
 	fi
 	if [ $udp_complete = "end" ] ; then
 		echo "      Not supported merging log_udp_complete by end time. Using start time"
-		tail -q -n+2 $files | sort -n -k3 >> "${output_dir}/${dir1}/log_udp_complete"
+		tail -q -n+2 $files | sort -n -k3 >> "${output_dir}/${output_tree}/log_udp_complete"
 	fi
 	if [ $udp_complete = "concat" ] ; then 
-		tail -q -n+2 $files >> "${output_dir}/${dir1}/log_udp_complete"
+		tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_udp_complete"
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_udp_complete" 2>/dev/null
+    fi
+
 
 
 	#4. Process log_http_complete
@@ -214,18 +239,22 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_http_complete"
 	done
 	# Print 1 header 
-	head -2 "$first_input/$dir1/log_http_complete" > "${output_dir}/${dir1}/log_http_complete"
+	head -2 "$first_input/$dir1/log_http_complete" > "${output_dir}/${output_tree}/log_http_complete"
 	# Concat the files
 	if [ $http_complete = "start" ] ; then 
-		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${output_tree}/log_http_complete"
 	fi
 	if [ $http_complete = "end" ] ; then
 		echo "      Not supported merging log_http_complete by end time. Using start time"
-		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files | sort -n -k5 >> "${output_dir}/${output_tree}/log_http_complete"
 	fi
 	if [ $http_complete = "concat" ] ; then 
-		tail -q -n+3 $files >> "${output_dir}/${dir1}/log_http_complete"
+		tail -q -n+3 $files >> "${output_dir}/${output_tree}/log_http_complete"
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_http_complete" 2>/dev/null
+    fi
 
 
 
@@ -238,17 +267,21 @@ for dir1 in $(ls $first_input); do
 		files="${files} ${dir_to_process[$indir]}/log_video_complete"
 	done
 	# Print 1 header 
-	head -1 "$first_input/$dir1/log_video_complete" > "${output_dir}/${dir1}/log_video_complete"
+	head -1 "$first_input/$dir1/log_video_complete" > "${output_dir}/${output_tree}/log_video_complete"
 	# Concat the files
 	if [ $video_complete = "start" ] ; then 
-		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${dir1}/log_video_complete"
+		tail -q -n+2 $files | sort -n -k29 >> "${output_dir}/${output_tree}/log_video_complete"
 	fi
 	if [ $video_complete = "end" ] ; then
-		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${dir1}/log_video_complete"
+		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${output_tree}/log_video_complete"
 	fi
 	if [ $video_complete = "concat" ] ; then 
-		tail -q -n+2 $files >> "${output_dir}/${dir1}/log_video_complete"
+		tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_video_complete"
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_video_complete" 2>/dev/null
+    fi
 
 
 
@@ -264,16 +297,20 @@ for dir1 in $(ls $first_input); do
 		# Concat the files
 		if [ $mm_complete = "start" ] ; then 
 			echo "      Not supported merging log_mm_complete by start time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_mm_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
 		if [ $mm_complete = "end" ] ; then
 			echo "      Not supported merging log_mm_complete by end time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_mm_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
 		if [ $mm_complete = "concat" ] ; then 
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_mm_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_mm_complete" 2>/dev/null
+    fi
 
 
 	#7. Process log_skype_complete
@@ -288,16 +325,20 @@ for dir1 in $(ls $first_input); do
 		# Concat the files
 		if [ $skype_complete = "start" ] ; then 
 			echo "      Not supported merging log_skype_complete by start time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_skype_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_skype_complete"
 		fi
 		if [ $skype_complete = "end" ] ; then
 			echo "      Not supported merging log_skype_complete by end time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_skype_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_skype_complete"
 		fi
 		if [ $skype_complete = "concat" ] ; then 
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_skype_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_skype_complete"
 		fi
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_skype_complete" 2>/dev/null
+    fi
 
 
 	#8. Process log_chat_complete
@@ -312,16 +353,20 @@ for dir1 in $(ls $first_input); do
 		# Concat the files
 		if [ $chat_complete = "start" ] ; then 
 			echo "      Not supported merging log_chat_complete by start time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_complete"
 		fi
 		if [ $chat_complete = "end" ] ; then
 			echo "      Not supported merging log_chat_complete by end time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_complete"
 		fi
 		if [ $chat_complete = "concat" ] ; then 
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_complete"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_complete"
 		fi
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_chat_complete" 2>/dev/null
+    fi
 
 
 	#9. Process log_chat_messages
@@ -336,16 +381,20 @@ for dir1 in $(ls $first_input); do
 		# Concat the files
 		if [ $chat_messages = "start" ] ; then 
 			echo "      Not supported merging log_chat_messages by start time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_messages"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_messages"
 		fi
 		if [ $chat_messages = "end" ] ; then
 			echo "      Not supported merging log_chat_messages by end time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_messages"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_messages"
 		fi
 		if [ $chat_messages = "concat" ] ; then 
-			tail -q -n+1 $files >> "${output_dir}/${dir1}/log_chat_messages"
+			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_messages"
 		fi
 	fi
+    # Compress if needed
+    if $compress ; then
+        gzip -f "${output_dir}/${output_tree}/log_chat_messages" 2>/dev/null
+    fi
 
 	# Delete merged directories, if required
 	if $delete_merged ; then

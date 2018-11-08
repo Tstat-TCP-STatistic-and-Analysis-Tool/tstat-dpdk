@@ -287,8 +287,8 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 		/* Increasing reading port number in Round-Robin logic */
 		read_from_port = (read_from_port + 1) % nb_sys_ports;
 		/* If all the ports have been polled, make the thread sleep */
-		if (read_from_port == 2)
-			sched_yield();
+		//if (read_from_port == 0)
+		//	sched_yield();
 	}
 	return 0;
 }

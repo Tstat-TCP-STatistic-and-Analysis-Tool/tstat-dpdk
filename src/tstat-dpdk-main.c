@@ -131,7 +131,6 @@ int main(int argc, char **argv)
 	intermediate_ring = rte_ring_lookup (name);
 
  	if (intermediate_ring == NULL ){
-        printf ("Cannot create ring: %s\n", rte_strerror(rte_errno));
         FATAL_ERROR("Cannot create ring");
     }
 
@@ -189,7 +188,6 @@ static void set_scheduling_policy_and_affinity(void){
 	sc_attr.sched_period = SCHED_TOTALTIME_NS;
 	ret = syscall(__NR_sched_setattr,0, &sc_attr, 0);
 	if (ret != 0) {
-        printf ("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
         FATAL_ERROR("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
 
     }
@@ -210,6 +208,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 
 	/* Call this function; its aim is evident */
 	set_scheduling_policy_and_affinity();
+	printf("NIC polling thread created with tid:%ld\n", syscall(SYS_gettid));
 
 	/* Reset ports stats */
 	for (i=0;i<nb_sys_ports; i++)

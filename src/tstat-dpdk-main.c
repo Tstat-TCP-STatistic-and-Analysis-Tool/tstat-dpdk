@@ -63,10 +63,6 @@ int main(int argc, char **argv)
 	rte_log_set_level (RTE_LOGTYPE_PMD, 0);
 	rte_openlog_stream(fopen("/dev/null", "w"));
 
-	/* Check if this application can use one core*/
-	ret = rte_lcore_count ();
-	if (ret != 1) FATAL_ERROR("This application needs exactly one (1) cores.");
-	current_core = rte_lcore_id ();
 
 	/* Parse arguments (must retrieve the total number of cores, which core I am, and time engine to use) */
 	ret = parse_args(argc, argv);
@@ -82,6 +78,43 @@ int main(int argc, char **argv)
 	nb_sys_ports = rte_eth_dev_count();
 	if (nb_sys_ports <= 0) FATAL_ERROR("Cannot find ETH devices\n");
 
+
+	/* One pool for each instance */
+	for (i = 0; i < nb_sys_cores; i++){
+		sprintf( pool_name, MEMPOOL_NAME "%2d", i);
+		pktmbuf_pool[i] = rte_mempool_create(pool_name, MEMPOOL_ELEM_NB, MEMPOOL_ELEM_SZ, MEMPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,  rte_lcore_to_socket_id  (i), 0);
+		if (pktmbuf_pool[i] == NULL) FATAL_ERROR("Cannot create cluster_mem_pool %d. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", i, rte_errno, ENOMEM, ENOSPC, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
+		
+	}
+
+	/* Operations needed for each ethernet device */			
+	for(i=0; i < nb_sys_ports; i++)
+		init_port(i);
+
+	/* Create the port_to_direction array*/
+	create_port_to_direction_array();
+
+	
+
+	/* Init intermediate queue data structures: the ring. Give each RING of different instances a different name */
+	for (i = 0; i < nb_sys_cores; i++){
+	    strcpy(name, INTERMEDIATERING_NAME);
+	    sprintf(nb_str, "%d", i);
+	    strcat(name, nb_str);
+	    rte_ring_create (name, INTERMEDIATERING_SZ, 0, RING_F_SP_ENQ | RING_F_SC_DEQ );
+    }
+
+	for (i = 1; i < nb_sys_cores; i++){
+        printf("Starting instance %d...\n", i);
+        if(fork() == 0) {
+            nb_istance = i;
+            printf("Instance %d alive\n", nb_istance);
+            break;
+        }
+	}
+	printf("All the %d instances are up.\n", nb_sys_cores);
+
+
 	/* Init libtstat, with per-instance log directory and conf files */
 	libtstat_conf_file[16] += nb_istance/10;
 	libtstat_conf_file[17] += nb_istance%10;
@@ -95,50 +128,17 @@ int main(int argc, char **argv)
 	strcpy(name, INTERMEDIATERING_NAME);
 	sprintf(nb_str, "%d", nb_istance);
 	strcat(name, nb_str);
-	intermediate_ring = rte_ring_create 	(name, INTERMEDIATERING_SZ, rte_socket_id(), RING_F_SP_ENQ | RING_F_SC_DEQ );
- 	if (intermediate_ring == NULL ) FATAL_ERROR("Cannot create ring");
+	intermediate_ring = rte_ring_lookup (name);
 
-	/* The master process initializes the ports and the memory pools for the NICs */
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY){
-
-		/* One pool for each instance */
-		for (i = 0; i < nb_sys_cores; i++){
-			sprintf( pool_name, MEMPOOL_NAME "%2d", i);
-			pktmbuf_pool[i] = rte_mempool_create(pool_name, MEMPOOL_ELEM_NB, MEMPOOL_ELEM_SZ, MEMPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,  rte_lcore_to_socket_id  (i), 0);
-			if (pktmbuf_pool[i] == NULL) FATAL_ERROR("Cannot create cluster_mem_pool %d. Errno: %d [ENOMEM: %d, ENOSPC: %d, E_RTE_NO_CONFIG: %d, E_RTE_SECONDARY: %d, EINVAL: %d, EEXIST: %d]\n", i, rte_errno, ENOMEM, ENOSPC, E_RTE_NO_CONFIG, E_RTE_SECONDARY, EINVAL, EEXIST  );
-			
-		}
-		/* Operations needed for each ethernet device */			
-		for(i=0; i < nb_sys_ports; i++)
-			init_port(i);
-	}
-	/* The slave process just opens the memory pools */
-	else{
-		/* One pool for each instance */
-		for (i = 0; i < nb_sys_cores; i++){
-			sprintf( pool_name, MEMPOOL_NAME "%2d", i);
-			pktmbuf_pool[i] = rte_mempool_lookup(pool_name);
-			if (pktmbuf_pool[i] == NULL) FATAL_ERROR("Cannot open mem_pool\n");
-
-		}
-	}
-
-	/* Create the port_to_direction array*/
-	create_port_to_direction_array();
+ 	if (intermediate_ring == NULL ){
+        printf ("Cannot create ring: %s\n", rte_strerror(rte_errno));
+        FATAL_ERROR("Cannot create ring");
+    }
 
 	/* Start producer thread (on the same core) */
 	ret = pthread_create(&producer_t, NULL, (void *(*)(void *))main_loop_producer, NULL);
-	if (ret != 0) FATAL_ERROR("Cannot start producer thread\n");	
+	if (ret != 0) FATAL_ERROR("Cannot start producer thread\n");
 
-	/* Start next instance of cluster */
-	if (nb_istance < nb_sys_cores - 1){
-		sprintf(command, "%s -c 0X%04x -n %d --proc-type=secondary -- -m %d -p %d &", argv[0], (int)pow(2,nb_istance+1), rte_memory_get_nchannel() ,nb_sys_cores, nb_istance+1);
-		printf("Starting instance %d...\nExecuting '%s'\n", nb_istance+2, command);	
-		system(command);
-	}
-	else
-		printf("All the %d instances are up.\n", nb_sys_cores);
-	
 	/* ... and then loop in consumer */
 	main_loop_consumer ( NULL );	
 
@@ -168,7 +168,7 @@ static void set_scheduling_policy_and_affinity(void){
 	sprintf(dir_command, "mkdir -p /dev/cpuset/%s", cpu_set_name);							/* Create the command to create the cpu set ...*/
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", current_core, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", nb_istance, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);													/* ... And execute it */	
 	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", 0, cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
@@ -188,7 +188,11 @@ static void set_scheduling_policy_and_affinity(void){
 	sc_attr.sched_deadline = SCHED_TOTALTIME_NS ;
 	sc_attr.sched_period = SCHED_TOTALTIME_NS;
 	ret = syscall(__NR_sched_setattr,0, &sc_attr, 0);
-	if (ret != 0) FATAL_ERROR("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
+	if (ret != 0) {
+        printf ("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
+        FATAL_ERROR("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
+
+    }
 
 }
 
@@ -206,7 +210,6 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 
 	/* Call this function; its aim is evident */
 	set_scheduling_policy_and_affinity();
-	printf("NIC polling thread created with tid:%ld\n", syscall(SYS_gettid));
 
 	/* Reset ports stats */
 	for (i=0;i<nb_sys_ports; i++)
@@ -287,8 +290,8 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 		/* Increasing reading port number in Round-Robin logic */
 		read_from_port = (read_from_port + 1) % nb_sys_ports;
 		/* If all the ports have been polled, make the thread sleep */
-		//if (read_from_port == 0)
-		//	sched_yield();
+		if (read_from_port == 0)
+			sched_yield();
 	}
 	return 0;
 }
@@ -304,6 +307,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 	struct rte_mbuf * m;
 	struct timeval tv;
 	struct rte_eth_stats stat;
+	struct rte_eth_stats all_stats_old [MAX_PORTS];
 
 	/* Create stats directory if not exists */
 	sprintf(command,"mkdir -p %s", dirname(strdup(STAT_FILE)));
@@ -392,24 +396,37 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 			fprintf(debug_file, "%9.3f "                , (double)(local_nb_drop-old_nb_drop + nic_missed_pkts-old_nic_missed_pkts )/( time-old_time )*freq/1000000 );	/* Losses */
 			fprintf(debug_file, "%8.1f \n"              , 100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100.0);	/* Memory usage*/
 
-			/* Print stats */
-			printf("Instance: %2d ", nb_istance);
-			printf("Pkts: %6ld ", (nb_tstat_packets-old_nb_tstat_packets));
-			printf("Avg: %5.3fus Max: %11.3fus StdDev: %8.3f ", average, max, std_dev );
-			printf("TCP cl.: %5ld UDP cl.: %5ld ", tcp_cleaned-old_tcp_cleaned, udp_cleaned-old_udp_cleaned);
-			printf("Rate: %5.3fMpps ", (double)(local_nb_packets - old_nb_packets)/(time-old_time)*freq/1000000 );
-			printf("Loss: %5.3fMpps ", (double)(   local_nb_drop-old_nb_drop   +   nic_missed_pkts-old_nic_missed_pkts   )/(   time-old_time   )*freq/1000000 );
-			printf("Mem. occupation: %3.0f%% ", 100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100.0);
-			printf("(%3.0f%% in tot.) ", (float)rte_mempool_in_use_count(pktmbuf_pool[nb_istance])/MEMPOOL_ELEM_NB*100.0);		
 
+
+		    if (nb_istance == 0){
+    		    printf("\n");
+			    for (i = 0; i < nb_sys_ports; i++){	
+				    rte_eth_stats_get(i, &stat);
+                    int packets = stat.ipackets - all_stats_old[i].ipackets;
+                    int missed = stat.imissed - all_stats_old[i].imissed;
+                    int errors = stat.ierrors - all_stats_old[i].ierrors;
+                    int tot = packets+missed+errors;
+                    int bytes = stat.ibytes - all_stats_old[i].ibytes;
+                    float rate_mbs = ((double)bytes)/(time-old_time)*freq/1000000;
+                    float rate_mps = ((double)packets)/(time-old_time)*freq/1000000;
+
+				    printf("PORT: %2d Rate: %8.3f Mbps %0.3f Mpps Rx: %8ld Missed: %8ld Err: %8ld Tot: %8ld Perc Drop: %6.3f%%",
+                                    i, rate_mbs,   rate_mps,       packets, missed,   errors,     tot, ((double)(errors + missed))/tot*100);
+                    all_stats_old[i] = stat;	
+
+
+			        if (  (missed+errors > 0)  || (local_nb_drop - old_nb_drop > 0) )
+				        printf (" <--------L-O-S-I-N-G---------");
+                    printf("\n");
+			    }
+		    }
+
+            printf ("    INSTANCE: %2d Processed: %8ld Drop: %8ld Tot: %8ld Buffer Occupancy: %6.3f%%\n",
+                                  nb_istance,  local_nb_packets - old_nb_packets , local_nb_drop-old_nb_drop, 
+                                  local_nb_packets - old_nb_packets + local_nb_drop-old_nb_drop,
+                                    100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100.0);
 	
-			/* If the NICs or the buffer are loosing packets, signal it */
-			if (  (nic_missed_pkts-old_nic_missed_pkts > 0)  || (local_nb_drop - old_nb_drop > 0) )
-				printf (" <--------L-O-S-I-N-G---------");
-			/* Print new line, print 2 new lines if I'm the last instance */
-			printf ("\n");
-			if (nb_istance == nb_sys_cores - 1)
-				printf("\n");
+
 
 			/* Update variables, and reset counters */
 			old_time = time;
@@ -538,8 +555,6 @@ static void init_port(int i) {
 
  	
 		}
-
-
 
 
 		/* Configure tx queue of current device on current NUMA socket. Mandatory configuration even if you want only rx packet */

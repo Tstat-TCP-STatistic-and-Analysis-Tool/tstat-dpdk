@@ -34,6 +34,7 @@ static uint64_t old_udp_cleaned = 0;
 static uint64_t old_nic_missed_pkts = 0;
 
 static void set_scheduling_policy_and_affinity(void);
+static void set_affinity_consumer(void);
 
 /* Main function */
 int main(int argc, char **argv)
@@ -58,10 +59,10 @@ int main(int argc, char **argv)
 	argv += ret;
 
 	/* Make standard output more silent */
-	rte_log_set_global_level ( RTE_LOG_EMERG );
-	rte_log_set_level (RTE_LOGTYPE_EAL, 0);
-	rte_log_set_level (RTE_LOGTYPE_PMD, 0);
-	rte_openlog_stream(fopen("/dev/null", "w"));
+	rte_log_set_global_level ( RTE_LOG_EMERG | RTE_LOG_ALERT | RTE_LOG_CRIT | RTE_LOG_ERR );
+	//rte_log_set_level (RTE_LOGTYPE_EAL, 1);
+	//rte_log_set_level (RTE_LOGTYPE_PMD, 1);
+	//rte_openlog_stream(fopen("/dev/null", "w"));
 
 
 	/* Parse arguments (must retrieve the total number of cores, which core I am, and time engine to use) */
@@ -134,6 +135,8 @@ int main(int argc, char **argv)
         FATAL_ERROR("Cannot create ring");
     }
 
+    set_affinity_consumer();
+
 	/* Start producer thread (on the same core) */
 	ret = pthread_create(&producer_t, NULL, (void *(*)(void *))main_loop_producer, NULL);
 	if (ret != 0) FATAL_ERROR("Cannot start producer thread\n");
@@ -145,6 +148,54 @@ int main(int argc, char **argv)
 }
 
 
+static void set_affinity_consumer(void){
+	struct sched_attr sc_attr;
+	uint64_t mask;
+	char * cpu_set_name = strdup(CPU_SET_NAME);
+	char dir_command [1000];
+	int ret;
+
+	cpu_set_name[10] += nb_istance/10;
+	cpu_set_name[11] += nb_istance%10;	
+
+	/* Remove affinity set atomatically by DPDK by setting affinity to all cores */
+	mask = 0xFFFFFFFFFFFFFFFF;
+	ret = sched_setaffinity(0, sizeof(mask), (cpu_set_t*)&mask);
+	if (ret != 0) FATAL_ERROR("Error: cannot set affinity. Quitting...\n");
+
+	/* Set affinity by means of cpuset (the only way to have affinity with SCHED_DEADLINE).*/ 
+	/* NOTE: The cpuset MUST have exclusive use of that CPU. Be sure that in you system there are not other CPU sets in conflict */
+
+	system("mkdir -p /dev/cpuset; mount -t cpuset cpuset /dev/cpuset");	
+
+	
+	sprintf(dir_command, "mkdir -p /dev/cpuset/%s", cpu_set_name);
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);	
+						
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", nb_istance, cpu_set_name);
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);	
+
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", 0, cpu_set_name);		
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);								
+
+    sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/cpuset.sched_load_balance");
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);
+
+	sprintf(dir_command, "/bin/echo 1 > /dev/cpuset/%s/cpuset.sched_load_balance; /bin/echo 1 > /dev/cpuset/%s/cpuset.cpu_exclusive; ", cpu_set_name, cpu_set_name);
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);
+			
+
+	sprintf(dir_command, "/bin/echo %ld > /dev/cpuset/%s/tasks", syscall(SYS_gettid), cpu_set_name);
+	printf("Executing: %s\n", dir_command);
+	system(dir_command);		
+
+}
+
 /* This function set sched_deadline policy and create a cpu set for the current thread */
 static void set_scheduling_policy_and_affinity(void){
 	
@@ -154,39 +205,29 @@ static void set_scheduling_policy_and_affinity(void){
 	char dir_command [1000];
 	int ret;
 
+	cpu_set_name[10] += nb_istance/10;
+	cpu_set_name[11] += nb_istance%10;	
+
 	/* Remove affinity set atomatically by DPDK by setting affinity to all cores */
 	mask = 0xFFFFFFFFFFFFFFFF;
 	ret = sched_setaffinity(0, sizeof(mask), (cpu_set_t*)&mask);
 	if (ret != 0) FATAL_ERROR("Error: cannot set affinity. Quitting...\n");
 
-	/* Set affinity by means of cpuset (the only way to have affinity with SCHED_DEADLINE).*/ 
-	/* NOTE: The cpuset MUST have exclusive use of that CPU. Be sure that in you system there are not other CPU sets in conflict */
-	system("mkdir -p /dev/cpuset; mount -t cpuset cpuset /dev/cpuset");						/* Create cpusets directory, if not exist */
-	cpu_set_name[10] += nb_istance/10;										/* Set name of new cpuset */
-	cpu_set_name[11] += nb_istance%10;		
-	sprintf(dir_command, "mkdir -p /dev/cpuset/%s", cpu_set_name);							/* Create the command to create the cpu set ...*/
+
+	sprintf(dir_command, "/bin/echo %ld > /dev/cpuset/%s/tasks", syscall(SYS_gettid), cpu_set_name);
 	printf("Executing: %s\n", dir_command);
-	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", nb_istance, cpu_set_name);				/* Create the command to set preferred CPU of the cpu set... */
-	printf("Executing: %s\n", dir_command);
-	system(dir_command);													/* ... And execute it */	
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", 0, cpu_set_name);			/* Create the command to set preferred memory on current numa node... */
-	printf("Executing: %s\n", dir_command);
-	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/cpuset.sched_load_balance; /bin/echo 1 > /dev/cpuset/cpuset.cpu_exclusive; ");/* Create the command to set random parameters needed by cpuset to work with SCHED_DEADLINE*/
-	printf("Executing: %s\n", dir_command);
-	system(dir_command);													/* ... And execute it */
-	sprintf(dir_command, "/bin/echo %ld > /dev/cpuset/%s/tasks", syscall(SYS_gettid), cpu_set_name);		/* Create command to put current thread in cpuset... */
-	printf("Executing: %s\n", dir_command);
-	system(dir_command);													/* ... And execute it */
+	system(dir_command);
 
 	/* Set up SCHED_DEADLINE policy */
 	sc_attr.size = sizeof(struct sched_attr);
 	sc_attr.sched_policy = SCHED_DEADLINE;
+	sc_attr.sched_flags = 0;
+	sc_attr.sched_nice = 0;
+	sc_attr.sched_priority = 0;
 	sc_attr.sched_runtime =  SCHED_RUNTIME_NS;
 	sc_attr.sched_deadline = SCHED_TOTALTIME_NS ;
 	sc_attr.sched_period = SCHED_TOTALTIME_NS;
-	ret = syscall(__NR_sched_setattr,0, &sc_attr, 0);
+	ret = sched_setattr(0, &sc_attr, 0);
 	if (ret != 0) {
         FATAL_ERROR("Cannot set thread scheduling policy. Ret code=%d Errno=%d (EINVAL=%d ESRCH=%d E2BIG=%d EINVAL=%d E2BIG=%d EBUSY=%d EINVAL=%d EPERM=%d). Quitting...\n",ret, errno, EINVAL, ESRCH , E2BIG, EINVAL ,E2BIG, EBUSY, EINVAL, EPERM);
 
@@ -234,57 +275,78 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 
 			/* If lost deadline, print a warning message */
 			if (time_ns > SCHED_TOTALTIME_NS*1.9)
-				printf("\nWARNING on instance %2d: lost scheduling deadline: %8.3fus instead of %8.3fus \n", nb_istance, (double)time_ns/1000 , (double)SCHED_TOTALTIME_NS/1000);
+				printf("\nWARNING on instance %2d: lost scheduling deadline: %8.3fus instead of %8.3fus \n",
+                         nb_istance, (double)time_ns/1000 , (double)SCHED_TOTALTIME_NS/1000);
 		}
 		#endif
 
 		/* Read a burst for current port at queue 'nb_istance'*/
-		nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, PKT_BURST_SZ);
+        if ( (nb_rx = rte_eth_rx_queue_count(read_from_port, nb_istance)) > 0 ){
 
-		/* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
-		t_pack = t_new;
-		ret = gettimeofday(&t_new, NULL);
-		if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
-		diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
-		if ( likely( nb_rx != 0) ) diff_usec /= nb_rx;
+		    #ifdef DEBUG_RX_BURST
+		        uint64_t time_before = rte_get_tsc_cycles();
+		    #endif
+
+		    nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, nb_rx);
+
+            // Print if rte_eth_rx_burst took too long
+		    #ifdef DEBUG_RX_BURST
+		        uint64_t time_after = rte_get_tsc_cycles();
+		        uint64_t diff_time = time_after - time_before;
+		        time_ns = (double)diff_time/rte_get_tsc_hz()*1000000000;
+		        if (time_ns > SCHED_TOTALTIME_NS)
+			        printf("\nWARNING on instance %2d, port %d, pkts %d: slow read: %8.3fus\n",
+                            nb_istance, read_from_port, nb_rx, (double)time_ns/1000);
+		    #endif
+
+		    /* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
+		    t_pack = t_new;
+		    ret = gettimeofday(&t_new, NULL);
+		    if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+		    diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
+		    if ( likely( nb_rx != 0) ) diff_usec /= nb_rx;
 		
-		/* For each received packet. */
-		for (i = 0; likely( i < nb_rx ) ; i++) {
-			/* Retreive packet from burst, increase the counter */
-			m = pkts_burst[i];
-			nb_packets++;
-
-			/* Adding to t_pack the diff_time */
-			t_pack.tv_usec += diff_usec;
-			if (unlikely ( t_pack.tv_usec > 1000000 )){
-				t_pack.tv_sec  += t_pack.tv_usec / 1000000;
-				t_pack.tv_usec %= 1000000;
-			}
-
-			/* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
-			m->tx_offload = t_pack.tv_sec;
-			m->udata64 =  t_pack.tv_usec;
 
 
-			/* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
-			#ifdef SUM_IP
-				/* Add a number to ip address if needed */
-				ip_h = (struct ipv4_hdr*)(rte_pktmbuf_mtod(m, char*) + sizeof(struct  ether_hdr));
-				ip_h->src_addr+=read_from_port*256*256*256;
-				ip_h->dst_addr+=read_from_port*256*256*256;
+		    /* For each received packet. */
+		    for (i = 0; likely( i < nb_rx ) ; i++) {
+
+			    /* Retreive packet from burst, increase the counter */
+			    m = pkts_burst[i];
+			    nb_packets++;
+
+			    /* Adding to t_pack the diff_time */
+			    t_pack.tv_usec += diff_usec;
+			    if (unlikely ( t_pack.tv_usec > 1000000 )){
+				    t_pack.tv_sec  += t_pack.tv_usec / 1000000;
+				    t_pack.tv_usec %= 1000000;
+			    }
+
+			    /* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
+			    m->tx_offload = t_pack.tv_sec;
+			    m->udata64 =  t_pack.tv_usec;
+
+
+			    /* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
+			    #ifdef SUM_IP
+				    /* Add a number to ip address if needed */
+				    ip_h = (struct ipv4_hdr*)(rte_pktmbuf_mtod(m, char*) + sizeof(struct  ether_hdr));
+				    ip_h->src_addr+=read_from_port*256*256*256;
+				    ip_h->dst_addr+=read_from_port*256*256*256;
 			
-			#endif // SUM_IP
+			    #endif // SUM_IP
 
-			/*Enqueue in FIFO */
-			ret = rte_ring_enqueue (intermediate_ring, m);
+			    /*Enqueue in FIFO */
+			    ret = rte_ring_enqueue (intermediate_ring, m);
 
-			/* If the ring is full, free the buffer */
-			if( unlikely(ret != 0 )) {
-				nb_drop++;
-				rte_pktmbuf_free((struct rte_mbuf *)m);
-			} 
+			    /* If the ring is full, free the buffer */
+			    if( unlikely(ret != 0 )) {
+				    nb_drop++;
+				    rte_pktmbuf_free((struct rte_mbuf *)m);
+			    } 
 
-		}
+		    }
+        }
 
 		/* Increasing reading port number in Round-Robin logic */
 		read_from_port = (read_from_port + 1) % nb_sys_ports;
@@ -458,7 +520,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 static void sig_handler(int signo)
 {
 	/* Catch just SIGTERM */
-	if (signo == SIGTERM || signo == SIGINT){
+	if (  (signo == SIGTERM || signo == SIGINT) ){
 		
 		/* Waiting time proportional to istance for correct output writing*/
 		usleep( (float)nb_istance/4*1000000);
@@ -468,7 +530,7 @@ static void sig_handler(int signo)
 		struct rte_eth_stats stat;
 
 		/* The master core print per port and per queue stats */
-		if (rte_eal_process_type() == RTE_PROC_PRIMARY){
+		if (rte_eal_process_type() == RTE_PROC_PRIMARY && nb_istance == 0){
 			for (i = 0; i < nb_sys_ports; i++){	
 				rte_eth_stats_get(i, &stat);
 				printf("\nPORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
@@ -493,8 +555,9 @@ static void sig_handler(int signo)
 		if (nb_istance == 0)
 			usleep( (float)nb_sys_cores/4*1000000);
 
-		exit(0);	
 	}
+
+	exit(0);	
 }
 
 /* Init each port with the configuration contained in the structs. Every interface has nb_sys_cores queues */

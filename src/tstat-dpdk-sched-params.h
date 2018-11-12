@@ -1,5 +1,7 @@
 /* In this file are contained data structures connected with SCHED_DEADLINE policy and needed in main_scheduler.c */
 
+// https://www.kernel.org/doc/Documentation/scheduler/sched-deadline.txt
+
 /* Deadline scheduling structure */
 struct sched_attr {
 	uint32_t size;              /* Size of this structure */
@@ -35,4 +37,15 @@ struct sched_attr {
 #ifndef SCHED_FLAG_RESET_ON_FORK
 #define SCHED_FLAG_RESET_ON_FORK 0x01
 #endif 
+
+
+int sched_setattr(pid_t pid,
+	  const struct sched_attr *attr,
+	  unsigned int flags)
+    {
+        return syscall(__NR_sched_setattr, pid, attr, flags);
+    }
+
+
+
 

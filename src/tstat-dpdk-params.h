@@ -3,7 +3,9 @@
 /* If you define DEBUG, stats will be printed */
 #define DEBUG
 /* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
-//#define DEBUG_DEADLINE
+#define DEBUG_DEADLINE
+/* If you want to monitor the time elapsed in rte_eth_rx_burst */
+#define DEBUG_RX_BURST
 /* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
 //#define SUM_IP
 /* If you define OFFLOAD_CPU, tstat-dpdk will stop polling for the packets in low traffic conditions */
@@ -13,8 +15,8 @@
 #define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
 #define TSTAT_LOG_DIR "tstat-logs/tstat00.log"
 
-#define SCHED_RUNTIME_NS     (   100*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
-#define SCHED_TOTALTIME_NS   ( 200*1000 )			//					period time:	2000 us
+#define SCHED_RUNTIME_NS     (   50*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
+#define SCHED_TOTALTIME_NS   ( 100*1000 )			//					period time:	2000 us
 #define CPU_SET_NAME "tstat-dpdk00"
 #define SLEEP_TIME_US 1000					// The time (in us) the consumer thread sleeps when finding empty buffer, if you enable OFFLOAD_CPU
 

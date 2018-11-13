@@ -3,7 +3,7 @@
 /* If you define DEBUG, stats will be printed */
 #define DEBUG
 /* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
-#define DEBUG_DEADLINE
+//#define DEBUG_DEADLINE
 /* If you want to monitor the time elapsed in rte_eth_rx_burst */
 #define DEBUG_RX_BURST
 /* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
@@ -15,8 +15,8 @@
 #define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
 #define TSTAT_LOG_DIR "tstat-logs/tstat00.log"
 
-#define SCHED_RUNTIME_NS     (   50*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
-#define SCHED_TOTALTIME_NS   ( 100*1000 )			//					period time:	2000 us
+#define SCHED_RUNTIME_NS     (   1500*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
+#define SCHED_TOTALTIME_NS   ( 2000*1000 )			//					period time:	2000 us
 #define CPU_SET_NAME "tstat-dpdk00"
 #define SLEEP_TIME_US 1000					// The time (in us) the consumer thread sleeps when finding empty buffer, if you enable OFFLOAD_CPU
 
@@ -32,7 +32,7 @@
 
 #define RX_QUEUE_SZ 4096					// The size of rx queue. Max is 4096 and is the one you'll have best performances with. Use lower if you want to use Burst Bulk Alloc.
 #define TX_QUEUE_SZ 256						// Unused, you don't tx packets
-#define PKT_BURST_SZ 4096					// The max size of batch of packets retreived when invoking the receive function. Use the RX_QUEUE_SZ for high speed
+#define PKT_BURST_SZ 32					// Unfortunately it is 32 in DPDK 18
 
 #define STDEV_THRESH 1		       				// define the threshold for calculating the stdev in millisecs. Samples higher than STDEV_THRESH will be ignored..
 #define STAT_FILE "tstat-stats/stats00.txt"			// define the file statistics are put in. Every instance has got statsX.txt file

@@ -241,7 +241,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 	struct timeval t_new, t_pack;
 	struct rte_mbuf * m;
 	struct ipv4_hdr * ip_h;
-	int i, nb_rx, read_from_port = 0, ret = 0;
+	int i, j, nb_rx, read_from_port = 0, ret = 0;
 	uint64_t diff_usec;
 	uint64_t time = 0, older_time = 0, diff_time=0;
 	double time_ns=0;
@@ -265,94 +265,98 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 	/* Infinite loop */
 	for (;;) {
 
-		#ifdef DEBUG_DEADLINE
-		/* Check if a deadline was lost */
-		if (read_from_port == 0){
-			time = rte_get_tsc_cycles();
-			diff_time = time - older_time;
-			older_time = time;
-			time_ns = (double)diff_time/rte_get_tsc_hz()*1000000000;
+        /* Loop on ports */
+        for (read_from_port = 0; read_from_port < nb_sys_ports; read_from_port++) {
 
-			/* If lost deadline, print a warning message */
-			if (time_ns > SCHED_TOTALTIME_NS*1.9)
-				printf("\nWARNING on instance %2d: lost scheduling deadline: %8.3fus instead of %8.3fus \n",
-                         nb_istance, (double)time_ns/1000 , (double)SCHED_TOTALTIME_NS/1000);
-		}
-		#endif
+            // Must poll at least RX_QUEUE_SZ in batches of PKT_BURST_SZ
+            for (j = 0; j< RX_QUEUE_SZ/PKT_BURST_SZ; j++){
 
-		/* Read a burst for current port at queue 'nb_istance'*/
-        if ( (nb_rx = rte_eth_rx_queue_count(read_from_port, nb_istance)) > 0 ){
+		        #ifdef DEBUG_DEADLINE
+		        /* Check if a deadline was lost */
+		        if (read_from_port == 0){
+			        time = rte_get_tsc_cycles();
+			        diff_time = time - older_time;
+			        older_time = time;
+			        time_ns = (double)diff_time/rte_get_tsc_hz()*1000000000;
 
-		    #ifdef DEBUG_RX_BURST
-		        uint64_t time_before = rte_get_tsc_cycles();
-		    #endif
+			        /* If lost deadline, print a warning message */
+			        if (time_ns > SCHED_TOTALTIME_NS*1.9)
+				        printf("\nWARNING on instance %2d: lost scheduling deadline: %8.3fus instead of %8.3fus \n",
+                                 nb_istance, (double)time_ns/1000 , (double)SCHED_TOTALTIME_NS/1000);
+		        }
+		        #endif
 
-		    nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, nb_rx);
+	            #ifdef DEBUG_RX_BURST
+	                uint64_t time_before = rte_get_tsc_cycles();
+	            #endif
 
-            // Print if rte_eth_rx_burst took too long
-		    #ifdef DEBUG_RX_BURST
-		        uint64_t time_after = rte_get_tsc_cycles();
-		        uint64_t diff_time = time_after - time_before;
-		        time_ns = (double)diff_time/rte_get_tsc_hz()*1000000000;
-		        if (time_ns > SCHED_TOTALTIME_NS)
-			        printf("\nWARNING on instance %2d, port %d, pkts %d: slow read: %8.3fus\n",
-                            nb_istance, read_from_port, nb_rx, (double)time_ns/1000);
-		    #endif
+	            nb_rx = rte_eth_rx_burst(read_from_port, nb_istance, pkts_burst, PKT_BURST_SZ);
 
-		    /* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
-		    t_pack = t_new;
-		    ret = gettimeofday(&t_new, NULL);
-		    if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
-		    diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
-		    if ( likely( nb_rx != 0) ) diff_usec /= nb_rx;
+                // Print if rte_eth_rx_burst took too long
+	            #ifdef DEBUG_RX_BURST
+	                uint64_t time_after = rte_get_tsc_cycles();
+	                uint64_t diff_time = time_after - time_before;
+	                time_ns = (double)diff_time/rte_get_tsc_hz()*1000000000;
+	                if (time_ns > SCHED_TOTALTIME_NS)
+		                printf("\nWARNING on instance %2d, port %d, pkts %d: slow read: %8.3fus\n",
+                                nb_istance, read_from_port, nb_rx, (double)time_ns/1000);
+	            #endif
+
+		        /* Read a burst for current port at queue 'nb_istance'*/
+                if ( likely(nb_rx  > 0 ) ){
+
+		            /* Create the batch times according to "Batch to the future" (various artists, most of them spanish)*/
+		            t_pack = t_new;
+		            ret = gettimeofday(&t_new, NULL);
+		            if ( unlikely( ret != 0) ) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+		            diff_usec = t_new.tv_sec * 1000000 + t_new.tv_usec - t_pack.tv_sec * 1000000 - t_pack.tv_usec;
+		            if ( likely( nb_rx != 0) ) diff_usec /= nb_rx;
 		
 
+		            /* For each received packet. */
+		            for (i = 0; likely( i < nb_rx ) ; i++) {
 
-		    /* For each received packet. */
-		    for (i = 0; likely( i < nb_rx ) ; i++) {
+			            /* Retreive packet from burst, increase the counter */
+			            m = pkts_burst[i];
+			            nb_packets++;
 
-			    /* Retreive packet from burst, increase the counter */
-			    m = pkts_burst[i];
-			    nb_packets++;
+			            /* Adding to t_pack the diff_time */
+			            t_pack.tv_usec += diff_usec;
+			            if (unlikely ( t_pack.tv_usec > 1000000 )){
+				            t_pack.tv_sec  += t_pack.tv_usec / 1000000;
+				            t_pack.tv_usec %= 1000000;
+			            }
 
-			    /* Adding to t_pack the diff_time */
-			    t_pack.tv_usec += diff_usec;
-			    if (unlikely ( t_pack.tv_usec > 1000000 )){
-				    t_pack.tv_sec  += t_pack.tv_usec / 1000000;
-				    t_pack.tv_usec %= 1000000;
-			    }
-
-			    /* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
-			    m->tx_offload = t_pack.tv_sec;
-			    m->udata64 =  t_pack.tv_usec;
+			            /* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
+			            m->tx_offload = t_pack.tv_sec;
+			            m->udata64 =  t_pack.tv_usec;
 
 
-			    /* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
-			    #ifdef SUM_IP
-				    /* Add a number to ip address if needed */
-				    ip_h = (struct ipv4_hdr*)(rte_pktmbuf_mtod(m, char*) + sizeof(struct  ether_hdr));
-				    ip_h->src_addr+=read_from_port*256*256*256;
-				    ip_h->dst_addr+=read_from_port*256*256*256;
+			            /* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
+			            #ifdef SUM_IP
+				            /* Add a number to ip address if needed */
+				            ip_h = (struct ipv4_hdr*)(rte_pktmbuf_mtod(m, char*) + sizeof(struct  ether_hdr));
+				            ip_h->src_addr+=read_from_port*256*256*256;
+				            ip_h->dst_addr+=read_from_port*256*256*256;
 			
-			    #endif // SUM_IP
+			            #endif // SUM_IP
 
-			    /*Enqueue in FIFO */
-			    ret = rte_ring_enqueue (intermediate_ring, m);
+			            /*Enqueue in FIFO */
+			            ret = rte_ring_enqueue (intermediate_ring, m);
 
-			    /* If the ring is full, free the buffer */
-			    if( unlikely(ret != 0 )) {
-				    nb_drop++;
-				    rte_pktmbuf_free((struct rte_mbuf *)m);
-			    } 
-
-		    }
+			            /* If the ring is full, free the buffer */
+			            if( unlikely(ret != 0 )) {
+				            nb_drop++;
+				            rte_pktmbuf_free((struct rte_mbuf *)m);
+			            } 
+                    }
+		        }
+            }
         }
+        
+        // Go to sleep after reading all ports
+        sched_yield();
 
-		/* Increasing reading port number in Round-Robin logic */
-		read_from_port = (read_from_port + 1) % nb_sys_ports;
-		/* If all the ports have been polled, make the thread sleep */
-		if (read_from_port == 0)
-			sched_yield();
 	}
 	return 0;
 }
@@ -608,7 +612,11 @@ static void init_port(int i) {
 		/* For each RX queue in each NIC rte_socket_id()  */
 		for (j = 0; j < nb_sys_cores; j++){
 			/* Configure rx queue j of current device on current NUMA socket. It takes elements from the mempool */
-			ret = rte_eth_rx_queue_setup(i, j, RX_QUEUE_SZ,  rte_lcore_to_socket_id ( j ), &rx_conf, pktmbuf_pool[j]);
+
+            rte_eth_dev_info_get(i, &dev_info);
+
+			ret = rte_eth_rx_queue_setup(i, j, RX_QUEUE_SZ,  rte_lcore_to_socket_id ( j ),
+                                        &dev_info.default_rxconf, pktmbuf_pool[j]);
 
 			if (ret < 0) FATAL_ERROR("Error configuring receiving queue\n");
 			/* Configure mapping [queue] -> [element in stats array] */

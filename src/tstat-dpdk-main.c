@@ -378,7 +378,8 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 	sprintf(command,"mkdir -p %s", dirname(strdup(STAT_FILE)));
 	system (command);
 
-	/* Init stats_rate as CPU clock: therefore stats will be printed each second. Convert threshold value from millisecs to clocks*/
+	/* Init stats_rate as CPU clock: therefore stats will be printed each second.
+       Convert threshold value from millisecs to clocks*/
 	stats_rate = rte_get_tsc_hz();
 	thresh = STDEV_THRESH * stats_rate / 1000;
 
@@ -472,8 +473,8 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
                     int errors = stat.ierrors - all_stats_old[i].ierrors;
                     int tot = packets+missed+errors;
                     int bytes = stat.ibytes - all_stats_old[i].ibytes;
-                    float rate_mbs = ((double)bytes)/(time-old_time)*freq/1000000;
-                    float rate_mps = ((double)packets)/(time-old_time)*freq/1000000;
+                    float rate_mbs = ((double)bytes)/(time-old_time)*freq/1000000*8;
+                    float rate_mps = ((double)packets)/(time-old_time)*freq/1000000*8;
 
 				    printf("PORT: %2d Rate: %8.3f Mbps %0.3f Mpps Rx: %8ld Missed: %8ld Err: %8ld Tot: %8ld Perc Drop: %6.3f%%",
                                     i, rate_mbs,   rate_mps,       packets, missed,   errors,     tot, ((double)(errors + missed))/tot*100);
@@ -487,8 +488,8 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		    }
 
             printf ("    INSTANCE: %2d Processed: %8ld Drop: %8ld Tot: %8ld Buffer Occupancy: %6.3f%%\n",
-                                  nb_istance,  local_nb_packets - old_nb_packets , local_nb_drop-old_nb_drop, 
-                                  local_nb_packets - old_nb_packets + local_nb_drop-old_nb_drop,
+                                  nb_istance,  local_nb_packets - old_nb_packets - (local_nb_drop-old_nb_drop), 
+                                  local_nb_drop-old_nb_drop, local_nb_packets - old_nb_packets, 
                                     100.0 - (float)rte_ring_free_count(intermediate_ring)/INTERMEDIATERING_SZ*100.0);
 	
 

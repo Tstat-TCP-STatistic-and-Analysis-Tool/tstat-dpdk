@@ -23,7 +23,9 @@ video_complete="end"
 mm_complete="concat"
 skype_complete="concat"
 chat_complete="concat"
-messages_complet="concat"
+chat_messages="concat"
+dns_complete="start"
+periodic_complete="start"
 # 5. Create directory tree
 create_tree=true
 MONTHS=(ZERO Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
@@ -141,7 +143,8 @@ for dir1 in $(ls $first_input); do
     if $create_tree ; then
         year=$(echo $output_tree | cut -d "_" -f 1)
         month=$(echo $output_tree | cut -d "_" -f 2)
-        month_str=${MONTHS[$month]}
+        month_int=$( echo $month | bc )
+        month_str=${MONTHS[$month_int]}
         new_output_tree=$year/${month}-${month_str}/$output_tree
         output_tree=$new_output_tree
     fi
@@ -406,8 +409,64 @@ for dir1 in $(ls $first_input); do
         fi
 	fi
 
+	#10. Process log_dns_complete
+	if [ -e "$first_input/$dir1/log_dns_complete" ]; then
+	    if [ "$debug" -gt "0" ]; then
+		    echo "   Merging log_dns_complete"
+	    fi
+	    files=""
+	    for indir in $input_dirs ; do
+		    files="${files} ${dir_to_process[$indir]}/log_dns_complete"
+	    done
+	    # Print 1 header 
+	    head -1 "$first_input/$dir1/log_dns_complete" > "${output_dir}/${output_tree}/log_dns_complete"
+	    # Concat the files
+	    if [ $dns_complete = "start" ] ; then 
+		    tail -q -n+2 $files | sort -n -k9 >> "${output_dir}/${output_tree}/log_dns_complete"
+	    fi
+	    if [ $dns_complete = "end" ] ; then
+		    echo "      Not supported merging log_dns_complete by end time. Using start time"
+		    tail -q -n+2 $files | sort -n -k9 >> "${output_dir}/${output_tree}/log_dns_complete"
+	    fi
+	    if [ $dns_complete = "concat" ] ; then 
+		    tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_dns_complete"
+	    fi
+        # Compress if needed
+        if $compress ; then
+            gzip -f "${output_dir}/${output_tree}/log_dns_complete" 2>/dev/null
+        fi
+    fi
 
-	#10. Process traces
+
+	#11. Process log_periodic_complete
+	if [ -e "$first_input/$dir1/log_periodic_complete" ]; then
+	    if [ "$debug" -gt "0" ]; then
+		    echo "   Merging log_periodic_complete"
+	    fi
+	    files=""
+	    for indir in $input_dirs ; do
+		    files="${files} ${dir_to_process[$indir]}/log_periodic_complete"
+	    done
+	    # Print 1 header 
+	    head -1 "$first_input/$dir1/log_periodic_complete" > "${output_dir}/${output_tree}/log_periodic_complete"
+	    # Concat the files
+	    if [ $periodic_complete = "start" ] ; then 
+		    tail -q -n+2 $files | sort -n -k5 >> "${output_dir}/${output_tree}/log_periodic_complete"
+	    fi
+	    if [ $periodic_complete = "end" ] ; then
+		    echo "      Not supported merging log_periodic_complete by end time. Using start time"
+		    tail -q -n+2 $files | sort -n -k5 >> "${output_dir}/${output_tree}/log_periodic_complete"
+	    fi
+	    if [ $periodic_complete = "concat" ] ; then 
+		    tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_periodic_complete"
+	    fi
+        # Compress if needed
+        if $compress ; then
+            gzip -f "${output_dir}/${output_tree}/log_periodic_complete" 2>/dev/null
+        fi
+    fi
+
+	#12. Process traces
 	if [ -e "$first_input/$dir1/traces00" ]; then
 
 		if [ "$debug" -gt "0" ]; then

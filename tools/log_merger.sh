@@ -495,7 +495,7 @@ for dir1 in $(ls $first_input); do
 		    done
 
             # Merge with mergecap
-            mergecap -w "${output_dir}/${output_tree}/traces00/$pcap_file" $files
+            mergecap -F pcap -w "${output_dir}/${output_tree}/traces00/$pcap_file" $files
 
             # Compress if needed
             if $compress ; then

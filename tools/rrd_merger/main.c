@@ -27,6 +27,10 @@
 //Uncomment next line to merge min and max
 //#define MIN_MAX
 
+#define TRUE 1
+#define FALSE 0
+
+
 //Struct wrapping files data
 typedef struct s_measurement{
     char name [MAX_NAME];

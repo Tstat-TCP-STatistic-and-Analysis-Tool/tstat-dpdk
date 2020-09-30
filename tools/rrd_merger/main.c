@@ -111,6 +111,8 @@ void parse_args(int argc, char *argv[]){
 void create_metadata(char * directory){
     DIR *dir;
     struct dirent *ent;
+    if (DEBUG > 1)
+        printf ("Using directory to build index: %s\n", directory);
 
     if ((dir = opendir (directory)) != NULL) {
 
@@ -134,7 +136,7 @@ void create_metadata(char * directory){
         exit (1);
     }
 
-        if (DEBUG > 0)
+    if (DEBUG > 0)
         printf("Metadata created\n");
 }
 
@@ -326,6 +328,7 @@ void sum_rras(xmlNodePtr * nodes, int n_nodes){
     int i;
     char * content;
     char buffer [MAX_NAME];
+    char has_a_not_nan = FALSE;
 
     // Get first row of each RRA
     for (i=0; i<n_nodes;i++){
@@ -345,8 +348,13 @@ void sum_rras(xmlNodePtr * nodes, int n_nodes){
         for (i = 0; i < n_nodes; i++){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
+            
             xmlFree(content);
-            sum += val;
+            
+            if (!isnan(val)){
+                has_a_not_nan = TRUE;
+                sum += val;
+            }
 
             if (i==0){
                 dst = rows[0]->children;
@@ -357,6 +365,9 @@ void sum_rras(xmlNodePtr * nodes, int n_nodes){
 
 
         }
+        
+        if (has_a_not_nan == FALSE)
+            sum = 0.0/0.0;
 
         // Write it on first RRA
         sprintf(buffer, "%e", sum);
@@ -375,6 +386,7 @@ void min_rras(xmlNodePtr * nodes, int n_nodes){
     int i;
     char * content;
     char buffer [MAX_NAME];
+    char has_a_not_nan = FALSE;
 
     // Get first row of each RRA
     for (i=0; i<n_nodes;i++){
@@ -395,7 +407,11 @@ void min_rras(xmlNodePtr * nodes, int n_nodes){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
             xmlFree(content);
-            if (val<min) min = val;
+            
+            if (!isnan(val)){
+                has_a_not_nan = TRUE;
+                if (val<min) min = val;
+            }
 
             if (i==0){
                 dst = rows[0]->children;
@@ -406,6 +422,9 @@ void min_rras(xmlNodePtr * nodes, int n_nodes){
 
 
         }
+        
+        if (has_a_not_nan == FALSE)
+            min = 0.0/0.0;
 
         // Write it on first RRA
         sprintf(buffer, "%e", min);
@@ -424,6 +443,7 @@ void max_rras(xmlNodePtr * nodes, int n_nodes){
     int i;
     char * content;
     char buffer [MAX_NAME];
+    char has_a_not_nan = FALSE;
 
     // Get first row of each RRA
     for (i=0; i<n_nodes;i++){
@@ -444,7 +464,11 @@ void max_rras(xmlNodePtr * nodes, int n_nodes){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
             xmlFree(content);
-            if (val>max) max = val;
+            
+            if (!isnan(val)){
+                has_a_not_nan = TRUE;
+                if (val>max) max = val;
+            }
 
             if (i==0){
                 dst = rows[0]->children;
@@ -456,6 +480,9 @@ void max_rras(xmlNodePtr * nodes, int n_nodes){
 
         }
 
+        if (has_a_not_nan == FALSE)
+            max = 0.0/0.0;
+            
         // Write it on first RRA
         sprintf(buffer, "%e", max);
         xmlNodeSetContent(dst, (xmlChar*)buffer);
@@ -473,6 +500,7 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes){
     int i;
     char * content;
     char buffer [MAX_NAME];
+    char has_a_not_nan = FALSE;
 
     // Get first row of each RRA
     for (i=0; i<n_nodes;i++){
@@ -493,7 +521,11 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes){
             content = (char*)xmlNodeGetContent (rows[i]->children);
             sscanf( content, "%lf", &val) ;
             xmlFree(content);
-            sum += val;
+            
+            if (!isnan(val)){
+                has_a_not_nan = TRUE;
+                sum += val;
+            }
 
             if (i==0){
                 dst = rows[0]->children;
@@ -504,6 +536,9 @@ void avg_rras(xmlNodePtr * nodes, int n_nodes){
 
 
         }
+
+        if (has_a_not_nan == FALSE)
+            sum = 0.0/0.0;
 
         // Write it on first RRA
         sprintf(buffer, "%e", sum/ n_nodes);

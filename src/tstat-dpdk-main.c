@@ -588,6 +588,7 @@ static void init_port(int i) {
 
 		/* Decide the seed to give the port, by default use the classical symmetrical*/
 		port_conf.rx_adv_conf.rss_conf.rss_key = rss_seed;
+		port_conf.rx_adv_conf.rss_conf.rss_key_len = sizeof(rss_seed);
 		port_conf_temp = port_conf;
 		for (j=0; j < nb_port_directions; j++){
 			strcpy (pci_address, port_address);

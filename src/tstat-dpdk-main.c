@@ -364,9 +364,11 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 	int ret, i;
-	uint64_t time, interval, end_time,freq, local_nb_packets, local_nb_drop, nic_missed_pkts, thresh;
+	uint64_t time, interval, end_time,freq, local_nb_packets, local_nb_drop, nic_missed_pkts, thresh, time_last_pkt;
 	double std_dev, average;
 	char * file_name;
+	unsigned char fakepkt_payload = {0x45,0x00,0x00,0x54,0x97,0x57,0x40,0x00,0x40,0x01,0xba,0x17,0xc0,0xa8,0x18,0x82,0x08,0x08,0x08,0x08};
+	int fakepkt_len = 21;
 	char command [100];
 	FILE * debug_file;
 	struct rte_mbuf * m;
@@ -389,6 +391,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 	file_name[18] += nb_istance%10;	
 	debug_file = fopen(file_name, "w");
 	fprintf(debug_file, "# PKTS        AVG          MAX      STDEV  TCP_FLW  UDP_FLW  INC_RATE LOSS_RATE MEM_PERC\n");
+	time_last_pkt  = rte_get_tsc_cycles();
 	
 	/* Infinite loop for consumer thread */
 	for(;;){
@@ -397,19 +400,36 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		ret = rte_ring_dequeue(intermediate_ring, (void**)&m);
 		
 		/* Continue polling if no packet available */
-		if( unlikely (ret != 0)) {
+		if(unlikely (ret != 0)) {
 
 			/* If there is no packet, freeze the thread for SLEEP_TIME_US microseconds */
 			#ifdef OFFLOAD_CPU
 				usleep(SLEEP_TIME_US);
 			#endif //OFFLOAD_CPU
+			
+			#ifdef FAKEPKT
+			    time = rte_get_tsc_cycles();
+			    if ( time - time_last_pkt > stats_rate * FAKEPKT_DELAY ){
+			        /* Need to send a keep-alive packet */
+			        time_last_pkt = rte_get_tsc_cycles();
+			        ret = gettimeofday(&tv, NULL);
+			        if (ret != 0) FATAL_ERROR("Error: gettimeofday failed. Quitting...\n");
+			        tstat_next_pckt(&(tv), (void* )&fakepkt_payload, (void* )(&fakepkt_payload+fakepkt_len-1),
+			                        fakepkt_len, port_to_direction[m->port] );
+                    printf("Warning: sent Keep Alive PKT to instance %d\n", nb_istance);
+			    }
+			#endif
+			
 			continue;
 		}
 
-		/* Read timestamp of the packet from unused fields of mbuf structure*/
+		/* Read timestamp of the packet from unused fields of mbuf structure */
 		tv.tv_usec = m->udata64;
 		tv.tv_sec = m->tx_offload;
 
+        /* Save when received last burst */
+        time_last_pkt = rte_get_tsc_cycles();
+        
 		/* When debugging calc and print a lot of stats */
 		#ifdef DEBUG
 

@@ -2,6 +2,9 @@
 
 /* If you define DEBUG, stats will be printed */
 #define DEBUG
+/* If you define FAKEPKT, a fake packet will be given to tstat every FAKEPKT_DELAY seconds of inactivity*/
+#define FAKEPKT
+#define FAKEPKT_DELAY 1
 /* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
 //#define DEBUG_DEADLINE
 /* If you want to monitor the time elapsed in rte_eth_rx_burst */

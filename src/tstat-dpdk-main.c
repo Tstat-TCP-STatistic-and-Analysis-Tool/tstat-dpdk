@@ -317,7 +317,10 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 		            for (i = 0; likely( i < nb_rx ) ; i++) {
 
 			            /* Retreive packet from burst, increase the counter */
-			            m = pkts_burst[i];
+			            m = pkts_burst[i];			            
+			            if (rte_pktmbuf_pkt_len(m) > rte_pktmbuf_data_len(m))
+			                FATAL_ERROR("The NIC is segmenting packets, not supported. Try increasing MEMPOOL_ELEM_SZ. Quitting...\n");
+			            
 			            nb_packets++;
 
 			            /* Adding to t_pack the diff_time */
@@ -439,7 +442,9 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* Pass to tstat and take time before and after */
 		time = rte_get_tsc_cycles();
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) -1 , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		tstat_next_pckt(&(tv),  (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)),
+		                        rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_pkt_len(m) -1 ,
+		                        (rte_pktmbuf_pkt_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
 
@@ -529,7 +534,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* If not debugging, just analyze the packets */
 		#else
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_data_len(m) -1 , (rte_pktmbuf_data_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_pkt_len(m) -1 , (rte_pktmbuf_pkt_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
 		#endif
 		
 		

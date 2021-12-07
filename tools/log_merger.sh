@@ -21,7 +21,7 @@ tcp_nocomplete="end"
 udp_complete="concat"
 http_complete="start"
 video_complete="end"
-mm_complete="concat"
+mm_complete="start"
 skype_complete="concat"
 chat_complete="concat"
 chat_messages="concat"
@@ -305,17 +305,20 @@ for dir1 in $(ls $first_input); do
 		for indir in $input_dirs ; do
 			files="${files} ${dir_to_process[$indir]}/log_mm_complete"
 		done
+		
+		# Print 1 header 
+	    head -1 "$first_input/$dir1/log_mm_complete" > "${output_dir}/${output_tree}/log_mm_complete"
+	    
 		# Concat the files
 		if [ $mm_complete = "start" ] ; then 
-			echo "      Not supported merging log_mm_complete by start time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
+			tail -q -n+2 $files | sort -n -k23 >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
 		if [ $mm_complete = "end" ] ; then
 			echo "      Not supported merging log_mm_complete by end time. Using concatenation"
-			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
+			tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
 		if [ $mm_complete = "concat" ] ; then 
-			tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_mm_complete"
+			tail -q -n+2 $files >> "${output_dir}/${output_tree}/log_mm_complete"
 		fi
         # Compress if needed
         if $compress ; then

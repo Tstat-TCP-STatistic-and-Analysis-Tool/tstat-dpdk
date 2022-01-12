@@ -7,6 +7,7 @@
 /* System vars */
 static int nb_sys_ports;
 static int nb_sys_cores;
+static int extra_header; /* Extra Bytes to skip to handle e.g., VLAN tag (set 4 in this case)*/
 static int nb_istance;
 static int current_core;
 static int port_to_direction [MAX_PORTS]; 	/* This array indicates for each port, its direction.
@@ -76,7 +77,7 @@ int main(int argc, char **argv)
 	#endif
 
 	/* Get number of ethernet devices */
-	nb_sys_ports = rte_eth_dev_count();
+	nb_sys_ports = rte_eth_dev_count_avail();
 	if (nb_sys_ports <= 0) FATAL_ERROR("Cannot find ETH devices\n");
 
 
@@ -332,7 +333,7 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 
 			            /* Writing packet timestamping in unused mbuf fields. (wild approac ! ) */
 			            m->tx_offload = t_pack.tv_sec;
-			            m->udata64 =  t_pack.tv_usec;
+			            m->ol_flags =  t_pack.tv_usec;
 
 
 			            /* Sum a number to incoming IP addresses according to incoming port. Useful just in lab test with duplicate packets */
@@ -427,7 +428,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 		}
 
 		/* Read timestamp of the packet from unused fields of mbuf structure */
-		tv.tv_usec = m->udata64;
+		tv.tv_usec = m->ol_flags;
 		tv.tv_sec = m->tx_offload;
 
         /* Save when received last burst */
@@ -442,9 +443,9 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* Pass to tstat and take time before and after */
 		time = rte_get_tsc_cycles();
-		tstat_next_pckt(&(tv),  (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)),
+		tstat_next_pckt(&(tv),  (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct rte_ether_hdr)) + extra_header,
 		                        rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_pkt_len(m) -1 ,
-		                        (rte_pktmbuf_pkt_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		                        (rte_pktmbuf_pkt_len(m) - sizeof(struct rte_ether_hdr) - extra_header), port_to_direction[m->port] );
 		end_time = rte_get_tsc_cycles();
 		interval = end_time - time;
 
@@ -534,7 +535,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 		/* If not debugging, just analyze the packets */
 		#else
-		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)), rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_pkt_len(m) -1 , (rte_pktmbuf_pkt_len(m) - sizeof(struct ether_hdr)), port_to_direction[m->port] );
+		tstat_next_pckt(&(tv), (void* )(rte_pktmbuf_mtod(m, char*)  + sizeof(struct ether_hdr)) + extra_header, rte_pktmbuf_mtod(m, char*) + rte_pktmbuf_pkt_len(m) -1 , (rte_pktmbuf_pkt_len(m) - sizeof(struct ether_hdr) - extra_header), port_to_direction[m->port] );
 		#endif
 		
 		
@@ -748,13 +749,16 @@ static int parse_args(int argc, char **argv)
 	/* Initialize variables to detect missing arguments */
 	nb_sys_cores = -1;
 	nb_istance = 0;
+	extra_header = 0;
 
 	/* Retrive arguments */
-	while ((option = getopt(argc, argv,"m:p:")) != -1) {
+	while ((option = getopt(argc, argv,"m:p:e:")) != -1) {
         	switch (option) {
              		case 'm' : nb_sys_cores = atoi(optarg); 
                  		break;
              		case 'p' : nb_istance = atoi(optarg);
+                 		break;
+                    case 'e' : extra_header = atoi(optarg);
                  		break;
              		default: return -1; 
 		}

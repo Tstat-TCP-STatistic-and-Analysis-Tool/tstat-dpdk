@@ -226,6 +226,8 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-c` and `-n` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
+`-e` option set **extra header bytes** to skip in order to arrive to the IP header. Example: set to 4 in case of a vlan tag. 
+
 Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
 
 Below you have an example of this output

@@ -434,6 +434,20 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
         /* Save when received last burst */
         time_last_pkt = rte_get_tsc_cycles();
         
+        /* Check packet is long enough*/
+        if (unlikely(rte_pktmbuf_pkt_len(m)-sizeof(struct rte_ether_hdr)-extra_header <= sizeof(struct rte_ipv4_hdr))){
+            rte_pktmbuf_free((struct rte_mbuf *)m);
+            continue;
+        }
+
+        /* Check is IP: extra header is consumed, as with VLAN ether type is after */
+        uint16_t ethertype;
+        ethertype = ntohs(*(uint16_t*)( rte_pktmbuf_mtod(m, char*) + extra_header + 12 )) ;
+        if ( ethertype != 0x0800 ){
+            rte_pktmbuf_free((struct rte_mbuf *)m);
+            continue;
+        }
+        
 		/* When debugging calc and print a lot of stats */
 		#ifdef DEBUG
 

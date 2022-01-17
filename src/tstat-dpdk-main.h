@@ -13,6 +13,7 @@
 #include <sched.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include <rte_common.h>
 #include <rte_log.h>

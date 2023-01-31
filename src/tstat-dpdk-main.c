@@ -443,7 +443,7 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
         /* Check is IP: extra header is consumed, as with VLAN ether type is after */
         uint16_t ethertype;
         ethertype = ntohs(*(uint16_t*)( rte_pktmbuf_mtod(m, char*) + extra_header + 12 )) ;
-        if ( ethertype != 0x0800 ){
+        if ( ethertype != 0x0800 && ethertype != 0x86dd ){
             rte_pktmbuf_free((struct rte_mbuf *)m);
             continue;
         }

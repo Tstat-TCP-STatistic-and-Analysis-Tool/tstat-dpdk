@@ -64,7 +64,7 @@ for dir1 in $(ls $first_input); do
 	fi
 
 	# Check modify time
-	dir_time=$(stat -c %X ${first_input}/${dir1})
+	dir_time=$(stat -c %Y ${first_input}/${dir1})
 	now=$(date +%s) 
 	if (( $now - $dir_time <= $time_guard_minutes * 60 )) ; then
 		if [ "$debug" -gt "0" ]; then
@@ -92,29 +92,13 @@ for dir1 in $(ls $first_input); do
 			dir_to_process[$curr_in_dir]="${curr_in_dir}/${dir1}"
 		# Check if the are dictories with names refering to close minutes
 		else
-			dir1_date_human=$(echo $dir1 | cut -d "." -f1 | awk -F "_" '{print $1 "-" $2 "-" $3 " " $4 ":" $5 ":00"}')
-			dir1_date_epoch=$(date -d "$dir1_date_human" +%s )
-			#Try one minute before
-			dir_less_epoch=$(( $dir1_date_epoch - 60 ))
-			dir_less_tstat=$(date -d @$dir_less_epoch +%Y_%m_%d_%H_%M.out)
-			if [ -d "${curr_in_dir}/$dir_less_tstat" ]; then
-				if [ "$debug" -gt "0" ]; then
-					echo "   In $curr_in_dir realligning on directory $dir_less_tstat."
-				fi
-				dir_to_process[$curr_in_dir]="${curr_in_dir}/$dir_less_tstat"
-				found_curr_dir=true
+			dir1_trunc=$(echo ${dir1} | cut -d "_" -f 1-4)
+			first_found=$( ls -d ${curr_in_dir}/${dir1_trunc}_* | head -1)
+			if [[ ! -z $first_found ]]
+			then
+			    dir_to_process[$curr_in_dir]="${first_found}"
+			    found_curr_dir=true
 			fi
-			#Try one minute later
-			dir_more_epoch=$(( $dir1_date_epoch + 60 ))
-			dir_more_tstat=$(date -d @$dir_more_epoch +%Y_%m_%d_%H_%M.out)
-			if [ -d "${curr_in_dir}/$dir_more_tstat" ]; then
-				if [ "$debug" -gt "0" ]; then
-					echo "   In $curr_in_dir realligning on directory $dir_more_tstat."
-				fi
-				dir_to_process[$curr_in_dir]="${curr_in_dir}/$dir_more_tstat"
-				found_curr_dir=true
-			fi
-			
 		fi
 
 		# If no directory is found, unset the flag

@@ -174,19 +174,19 @@ static void set_affinity_consumer(void){
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);	
 						
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.cpus", nb_istance, cpu_set_name);
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpus", nb_istance, cpu_set_name);
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);	
 
-	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/cpuset.mems", 0, cpu_set_name);		
+	sprintf(dir_command, "/bin/echo %d > /dev/cpuset/%s/mems", 0, cpu_set_name);		
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);								
 
-    sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/cpuset.sched_load_balance");
+    sprintf(dir_command, "/bin/echo 0 > /dev/cpuset/sched_load_balance");
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);
 
-	sprintf(dir_command, "/bin/echo 1 > /dev/cpuset/%s/cpuset.sched_load_balance; /bin/echo 1 > /dev/cpuset/%s/cpuset.cpu_exclusive; ", cpu_set_name, cpu_set_name);
+	sprintf(dir_command, "/bin/echo 1 > /dev/cpuset/%s/sched_load_balance; /bin/echo 1 > /dev/cpuset/%s/cpu_exclusive; ", cpu_set_name, cpu_set_name);
 	printf("Executing: %s\n", dir_command);
 	system(dir_command);
 			
@@ -682,13 +682,14 @@ static void init_port(int i) {
 
 		/* Print link status */
 		rte_eth_link_get_nowait(i, &link);
-		if (link.link_status) 	printf("\tPort %d Link Up - speed %u Mbps - %s\n", (uint8_t)i, (unsigned)link.link_speed,(link.link_duplex == ETH_LINK_FULL_DUPLEX) ?("full-duplex") : ("half-duplex\n"));
+		if (link.link_status) 	printf("\tPort %d Link Up - speed %u Mbps - %s\n", (uint8_t)i, (unsigned)link.link_speed,(link.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ?("full-duplex") : ("half-duplex\n"));
 		else			printf("\tPort %d Link Down\n",(uint8_t)i);
 
 		/* Print RSS support, not reliable because a NIC could support rss configuration just in rte_eth_dev_configure whithout supporting rte_eth_dev_rss_hash_conf_get*/
 		rss_conf.rss_key = rss_key;
+		rss_conf.rss_key_len = sizeof(rss_seed);
 		ret = rte_eth_dev_rss_hash_conf_get (i,&rss_conf);
-		if (ret == 0) printf("\tDevice supports RSS\n"); else printf("\tDevice DOES NOT support RSS\n");
+		if (ret == 0) printf("\tDevice supports RSS\n"); else printf("\tDevice DOES NOT support RSS: %s\n", rte_strerror(-ret));
 		
 
 		/* Sperimental, try unbalanced queue distribution for RSS in order to mitigate asymmetrical speed of instance due to hypethreading 

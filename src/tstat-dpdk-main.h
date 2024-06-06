@@ -70,15 +70,15 @@ struct port_dir{
 /* Struct for devices configuration for const defines see rte_ethdev.h */
 static struct rte_eth_conf port_conf = {
 	.rxmode = {
-		.mq_mode = ETH_MQ_RX_RSS,  	/* Enable RSS */
+		.mq_mode = RTE_ETH_MQ_RX_RSS,  	/* Enable RSS */
 	},
 	.txmode = {
-		.mq_mode = ETH_MQ_TX_NONE,
+		.mq_mode = RTE_ETH_MQ_TX_NONE,
 	},
 	.rx_adv_conf = {
 		.rss_conf = {
 			.rss_key_len = 40,				/* and the seed length.					*/
-			.rss_hf = (ETH_RSS_NONFRAG_IPV4_TCP | ETH_RSS_NONFRAG_IPV4_UDP | ETH_RSS_NONFRAG_IPV6_TCP | ETH_RSS_NONFRAG_IPV6_UDP ) ,
+			.rss_hf = (RTE_ETH_RSS_NONFRAG_IPV4_TCP | RTE_ETH_RSS_NONFRAG_IPV4_UDP | RTE_ETH_RSS_NONFRAG_IPV6_TCP | RTE_ETH_RSS_NONFRAG_IPV6_UDP ) ,
 		}	
 	}
 };

@@ -27,6 +27,7 @@ chat_complete="concat"
 chat_messages="concat"
 dns_complete="start"
 periodic_complete="start"
+periodic_udp_complete="start"
 # 5. Create directory tree
 create_tree=true
 MONTHS=(ZERO Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)

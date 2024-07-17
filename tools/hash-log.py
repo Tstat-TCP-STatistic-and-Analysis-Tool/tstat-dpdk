@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import hashlib
+import ipaddress
 from cachetools import cached
 
 help="""
@@ -95,20 +96,27 @@ def main():
 def anon(ip,is_crypto,salt):
 
     # Operate only on already anonymized addresses
-    if is_crypto == "1":
+    if is_crypto.strip() == "1":
         # For IPv4, hash the address with salt
         if "." in ip:
-            return hashlib.sha256( f"{salt}:{ip}".encode('utf-8')).hexdigest()[:HASH_LEN]
+            return "IPv4:" + hashlib.sha256( f"{salt}:{ip}".encode('utf-8')).hexdigest()[:HASH_LEN]
         # For IPv6, get the IPv4 from using the 6to4 mechanism
         elif ":" in ip:
-            w1 = ip.split(":")[2].rjust(4, '0')
-            w2 = ip.split(":")[3].rjust(4, '0')
+            ip = ipaddress.ip_address(ip.strip()).exploded
+            w1 = ip.split(":")[2]
+            w2 = ip.split(":")[3]
             b1 =  int(w1[0:2],16)
             b2 =  int(w1[2:4],16)
             b3 =  int(w2[0:2],16)
             b4 =  int(w2[2:4],16)
             ip_virt = f"{b1}.{b2}.{b3}.{b4}"
-            return hashlib.sha256( f"{salt}:{ip_virt}".encode('utf-8')).hexdigest()[:HASH_LEN]
+            hashed_p1 = hashlib.sha256( f"{salt}:{ip_virt}".encode('utf-8')).hexdigest()[:HASH_LEN]
+
+            host = ":".join(ip.split(":")[4:8])
+            hashed_p2 = hashlib.sha256( f"{salt}:{host}".encode('utf-8')).hexdigest()[:HASH_LEN]
+
+            hashed = "IPv6:" + hashed_p1 + ":" + hashed_p2
+            return hashed
         # Notice in case of problems
         else:
             print(f"Unknown IP: {ip}", file=sys.stderr)

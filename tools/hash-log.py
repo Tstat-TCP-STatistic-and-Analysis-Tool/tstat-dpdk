@@ -16,6 +16,7 @@ The user must specify the <log> argument. This tool supports Tstat logs:
 - log_dns_complete
 - log_mm_complete
 - log_periodic_complete
+- log_periodic_udp_complete
 The hash is salted using the <salt> argument.
 The tool is a noop if <active> is 0.
 """

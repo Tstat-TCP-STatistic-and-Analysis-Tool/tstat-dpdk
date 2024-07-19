@@ -14,24 +14,10 @@ time_guard_minutes=60
 delete_merged=true
 # 3. Debug level
 debug=1
-# 4. Log merging algorithm: can be <end> (sort by flow ending time), <start> (sort by flow starting time), <concat> (concatenate the files)
-#    Please note: not for every log the three merging algorithms are available
-tcp_complete="end"
-tcp_nocomplete="end"
-udp_complete="concat"
-http_complete="start"
-video_complete="end"
-mm_complete="start"
-skype_complete="concat"
-chat_complete="concat"
-chat_messages="concat"
-dns_complete="start"
-periodic_complete="start"
-periodic_udp_complete="start"
-# 5. Create directory tree
+# 4. Create directory tree
 create_tree=true
 MONTHS=(ZERO Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
-# 6. Compress in gz files
+# 5. Compress in gz files
 compress=true
 
 # CODE
@@ -158,16 +144,8 @@ for dir1 in $(ls $first_input); do
 	    done
 	    # Print 1 header 
 	    head -1 "$first_input/$dir1/log_tcp_complete" > "${output_dir}/${output_tree}/log_tcp_complete"
-	    # Concat the files
-	    if [ $tcp_complete = "start" ] ; then
-		    tail -q -n+2 $files | sort -n -k29 | $hashlog log_tcp_complete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_complete"
-	    fi
-	    if [ $tcp_complete = "end" ] ; then
-		    tail -q -n+2 $files | sort -n -k30 | $hashlog log_tcp_complete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_complete"
-	    fi
-	    if [ $tcp_complete = "concat" ] ; then
-		    tail -q -n+2 $files | $hashlog log_tcp_complete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_complete"
-	    fi
+	    # Merge by end time
+		tail -q -n+2 $files | sort -n -k30 | $hashlog log_tcp_complete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_complete"
         # Compress if needed
         if $compress ; then
             gzip -f "${output_dir}/${output_tree}/log_tcp_complete" 2>/dev/null
@@ -186,16 +164,8 @@ for dir1 in $(ls $first_input); do
 	    done
 	    # Print 1 header 
 	    head -1 "$first_input/$dir1/log_tcp_nocomplete" > "${output_dir}/${output_tree}/log_tcp_nocomplete"
-	    # Concat the files
-	    if [ $tcp_nocomplete = "start" ] ; then
-		    tail -q -n+2 $files | sort -n -k29 | $hashlog log_tcp_nocomplete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
-	    fi
-	    if [ $tcp_nocomplete = "end" ] ; then
-		    tail -q -n+2 $files | sort -n -k30 | $hashlog log_tcp_nocomplete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
-	    fi
-	    if [ $tcp_nocomplete = "concat" ] ; then
-		    tail -q -n+2 $files | $hashlog log_tcp_nocomplete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
-	    fi
+	    # Merge by end time
+		tail -q -n+2 $files | sort -n -k30 | $hashlog log_tcp_nocomplete $salt 1 >> "${output_dir}/${output_tree}/log_tcp_nocomplete"
         # Compress if needed
         if $compress ; then
             gzip -f "${output_dir}/${output_tree}/log_tcp_nocomplete" 2>/dev/null
@@ -214,16 +184,7 @@ for dir1 in $(ls $first_input); do
 	    # Print 1 header 
 	    head -1 "$first_input/$dir1/log_udp_complete" > "${output_dir}/${output_tree}/log_udp_complete"
 	    # Concat the files
-	    if [ $udp_complete = "start" ] ; then 
-		    tail -q -n+2 $files | sort -n -k3 | $hashlog log_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_udp_complete"
-	    fi
-	    if [ $udp_complete = "end" ] ; then
-		    echo "      Not supported merging log_udp_complete by end time. Using start time"
-		    tail -q -n+2 $files | sort -n -k3 | $hashlog log_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_udp_complete"
-	    fi
-	    if [ $udp_complete = "concat" ] ; then 
-		    tail -q -n+2 $files | $hashlog log_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_udp_complete"
-	    fi
+		tail -q -n+2 $files | $hashlog log_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_udp_complete"
         # Compress if needed
         if $compress ; then
             gzip -f "${output_dir}/${output_tree}/log_udp_complete" 2>/dev/null
@@ -242,18 +203,8 @@ for dir1 in $(ls $first_input); do
 		
 		# Print 1 header 
 	    head -1 "$first_input/$dir1/log_mm_complete" > "${output_dir}/${output_tree}/log_mm_complete"
-	    
 		# Concat the files
-		if [ $mm_complete = "start" ] ; then 
-			tail -q -n+2 $files | sort -n -k23 | $hashlog log_mm_complete $salt 1 >> "${output_dir}/${output_tree}/log_mm_complete"
-		fi
-		if [ $mm_complete = "end" ] ; then
-			echo "      Not supported merging log_mm_complete by end time. Using concatenation"
-			tail -q -n+2 $files | $hashlog log_mm_complete $salt 1 >> "${output_dir}/${output_tree}/log_mm_complete"
-		fi
-		if [ $mm_complete = "concat" ] ; then 
-			tail -q -n+2 $files | $hashlog log_mm_complete $salt 1 >> "${output_dir}/${output_tree}/log_mm_complete"
-		fi
+		tail -q -n+2 $files | sort -n -k23 | $hashlog log_mm_complete $salt 1 >> "${output_dir}/${output_tree}/log_mm_complete"
         # Compress if needed
         if $compress ; then
             gzip -f "${output_dir}/${output_tree}/log_mm_complete" 2>/dev/null
@@ -271,17 +222,8 @@ for dir1 in $(ls $first_input); do
 	    done
 	    # Print 1 header 
 	    head -1 "$first_input/$dir1/log_dns_complete" > "${output_dir}/${output_tree}/log_dns_complete"
-	    # Concat the files
-	    if [ $dns_complete = "start" ] ; then 
-		    tail -q -n+2 $files | sort -n -k9 | $hashlog log_dns_complete $salt 1 >> "${output_dir}/${output_tree}/log_dns_complete"
-	    fi
-	    if [ $dns_complete = "end" ] ; then
-		    echo "      Not supported merging log_dns_complete by end time. Using start time"
-		    tail -q -n+2 $files | sort -n -k9 | $hashlog log_dns_complete $salt 1 >> "${output_dir}/${output_tree}/log_dns_complete"
-	    fi
-	    if [ $dns_complete = "concat" ] ; then 
-		    tail -q -n+2 $files | $hashlog log_dns_complete $salt 1 >> "${output_dir}/${output_tree}/log_dns_complete"
-	    fi
+	    # Merge by start time
+		tail -q -n+2 $files | sort -n -k9 | $hashlog log_dns_complete $salt 1 >> "${output_dir}/${output_tree}/log_dns_complete"
         # Compress if needed
         if $compress ; then
             gzip -f "${output_dir}/${output_tree}/log_dns_complete" 2>/dev/null
@@ -289,59 +231,41 @@ for dir1 in $(ls $first_input); do
     fi
 
 
-	#11. Process log_periodic_complete
-	if [ -e "$first_input/$dir1/log_periodic_complete" ]; then
+	#11. Process log_tcp_periodic
+	if [ -e "$first_input/$dir1/log_tcp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
-		    echo "   Merging log_periodic_complete"
+		    echo "   Merging log_tcp_periodic"
 	    fi
 	    files=""
 	    for indir in $input_dirs ; do
-		    files="${files} ${dir_to_process[$indir]}/log_periodic_complete"
+		    files="${files} ${dir_to_process[$indir]}/log_tcp_periodic"
 	    done
 	    # Print 1 header 
-	    head -1 "$first_input/$dir1/log_periodic_complete" > "${output_dir}/${output_tree}/log_periodic_complete"
-	    # Concat the files
-	    if [ $periodic_complete = "start" ] ; then 
-		    tail -q -n+2 $files | sort -n -k5 | $hashlog log_periodic_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_complete"
-	    fi
-	    if [ $periodic_complete = "end" ] ; then
-		    echo "      Not supported merging log_periodic_complete by end time. Using start time"
-		    tail -q -n+2 $files | sort -n -k5 | $hashlog log_periodic_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_complete"
-	    fi
-	    if [ $periodic_complete = "concat" ] ; then 
-		    tail -q -n+2 $files | $hashlog log_periodic_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_complete"
-	    fi
+	    head -1 "$first_input/$dir1/log_tcp_periodic" > "${output_dir}/${output_tree}/log_tcp_periodic"
+	    # Merge by start time
+		tail -q -n+2 $files | sort -n -k5 | $hashlog log_tcp_periodic $salt 1 >> "${output_dir}/${output_tree}/log_tcp_periodic"
         # Compress if needed
         if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_periodic_complete" 2>/dev/null
+            gzip -f "${output_dir}/${output_tree}/log_tcp_periodic" 2>/dev/null
         fi
     fi
     
-	#12. Process log_periodic_udp_complete
-	if [ -e "$first_input/$dir1/log_periodic_udp_complete" ]; then
+	#12. Process log_udp_periodic
+	if [ -e "$first_input/$dir1/log_udp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
-		    echo "   Merging log_periodic_udp_complete"
+		    echo "   Merging log_udp_periodic"
 	    fi
 	    files=""
 	    for indir in $input_dirs ; do
-		    files="${files} ${dir_to_process[$indir]}/log_periodic_udp_complete"
+		    files="${files} ${dir_to_process[$indir]}/log_udp_periodic"
 	    done
 	    # Print 1 header 
-	    head -1 "$first_input/$dir1/log_periodic_udp_complete" > "${output_dir}/${output_tree}/log_periodic_udp_complete"
-	    # Concat the files
-	    if [ $periodic_udp_complete = "start" ] ; then 
-		    tail -q -n+2 $files | sort -n -k9 | $hashlog log_periodic_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_udp_complete"
-	    fi
-	    if [ $periodic_udp_complete = "end" ] ; then
-		    echo "      Not supported merging log_periodic_udp_complete by end time. Using start time"
-		    tail -q -n+2 $files | sort -n -k9 | $hashlog log_periodic_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_udp_complete"
-	    fi
-	    if [ $periodic_udp_complete = "concat" ] ; then 
-		    tail -q -n+2 $files | $hashlog log_periodic_udp_complete $salt 1 >> "${output_dir}/${output_tree}/log_periodic_udp_complete"
-	    fi
+	    head -1 "$first_input/$dir1/log_udp_periodic" > "${output_dir}/${output_tree}/log_udp_periodic"
+	    # Merge by start time
+		tail -q -n+2 $files | sort -n -k9 | $hashlog log_udp_periodic $salt 1 >> "${output_dir}/${output_tree}/log_udp_periodic"
         # Compress if needed
         if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_periodic_udp_complete" 2>/dev/null
+            gzip -f "${output_dir}/${output_tree}/log_udp_periodic" 2>/dev/null
         fi
     fi
 

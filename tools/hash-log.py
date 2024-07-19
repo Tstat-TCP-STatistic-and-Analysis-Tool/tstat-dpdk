@@ -58,12 +58,12 @@ def main():
         s_ip_col=10 -1
         c_iscrypto_col=7 -1
         s_iscrypto_col=13 -1
-    elif log == "log_periodic_complete":
+    elif log == "log_tcp_periodic":
         c_ip_col=1 -1
         s_ip_col=3 -1
         c_iscrypto_col=45 -1
         s_iscrypto_col=46 -1
-    elif log == "log_periodic_udp_complete":
+    elif log == "log_udp_periodic":
         c_ip_col=1 -1
         s_ip_col=5 -1
         c_iscrypto_col=4 -1

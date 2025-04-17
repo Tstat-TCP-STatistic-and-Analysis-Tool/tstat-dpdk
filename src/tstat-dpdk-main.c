@@ -516,8 +516,16 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
                     float rate_mbs = ((double)bytes)/(time-old_time)*freq/1000000*8;
                     float rate_mps = ((double)packets)/(time-old_time)*freq/1000000;
 
-				    printf("PORT: %2d Rate: %8.3f Mbps %0.3f Mpps Rx: %8ld Missed: %8ld Err: %8ld Tot: %8ld Perc Drop: %6.3f%%",
-                                    i, rate_mbs,   rate_mps,       packets, missed,   errors,     tot, ((double)(errors + missed))/tot*100);
+	       	char buffer[100];
+                    struct timeval tv;
+                    struct tm *tm_info;
+    	        	gettimeofday(&tv, NULL);
+    			tm_info = localtime(&tv.tv_sec);
+    			strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm_info);
+
+
+				    printf("TIME: %s - PORT: %2d Rate: %8.3f Mbps %0.3f Mpps Rx: %8ld Missed: %8ld Err: %8ld Tot: %8ld Perc Drop: %6.3f%%",
+                                    buffer, i, rate_mbs,   rate_mps,       packets, missed,   errors,     tot, ((double)(errors + missed))/tot*100);
                     all_stats_old[i] = stat;	
 
 
@@ -577,8 +585,16 @@ static void sig_handler(int signo)
 		/* The master core print per port and per queue stats */
 		if (rte_eal_process_type() == RTE_PROC_PRIMARY && nb_istance == 0){
 			for (i = 0; i < nb_sys_ports; i++){	
+
 				rte_eth_stats_get(i, &stat);
-				printf("\nPORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
+				char buffer[100];
+                                struct timeval tv;
+                                struct tm *tm_info;
+    			        gettimeofday(&tv, NULL);
+    			        tm_info = localtime(&tv.tv_sec);
+    			        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm_info);
+				printf("\nTIME: %s - PORT: %d Rx: %ld Drp: %ld Tot: %ld Perc: %.3f%%", buffer, i, stat.ipackets, stat.imissed, stat.ipackets+stat.imissed, (float)stat.imissed/(stat.ipackets+stat.imissed)*100 );
+
 				for (j = 0; j < nb_sys_cores; j++){
 					/* Per port queue stats */
 					printf("\n\tQueue %d Rx: %ld Err: %ld Tot: %ld", j, stat.q_ipackets[j] ,stat.q_errors[j], stat.q_ipackets[j]+stat.q_errors[j]);

@@ -18,6 +18,8 @@ static int port_to_direction [MAX_PORTS]; 	/* This array indicates for each port
 /* Data structs of the system*/
 static struct rte_ring    * intermediate_ring;
 static struct rte_mempool * pktmbuf_pool [MAX_QUEUES];
+static pid_t children [MAX_QUEUES];
+
 /* Stats */
 static uint64_t stats_rate = 0;
 static uint64_t nb_drop=0;
@@ -108,13 +110,20 @@ int main(int argc, char **argv)
 
 	for (i = 1; i < nb_sys_cores; i++){
         printf("Starting instance %d...\n", i);
-        if(fork() == 0) {
+        pid_t pid = fork();
+        if(pid == 0) {
             nb_istance = i;
             printf("Instance %d alive\n", nb_istance);
             break;
         }
+        else if (pid>0){
+            children[i] = pid;
+        }
+        else{
+            printf("Error forking a child");
+            return 1;
+        }
 	}
-	printf("All the %d instances are up.\n", nb_sys_cores);
 
 
 	/* Init libtstat, with per-instance log directory and conf files */
@@ -365,6 +374,21 @@ static int main_loop_producer(__attribute__((unused)) void * arg){
 	return 0;
 }
 
+/* The master core checks all childern are running */
+static void check_children(void){
+    int i;
+    if (nb_istance == 0){
+        /* The master core checks all childern are running */
+        for (i = 1; i < nb_sys_cores; i++){
+            int ret = waitpid(children[i], NULL, WNOHANG);
+            if (ret > 0){ /* Means it returned the pid of the DEAD child */
+                printf("Process %d (PID=%d) has died. Terminating.\n", i, children[i]);
+                raise(SIGINT);
+            }
+        }
+    }
+}
+
 static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 	int ret, i;
@@ -414,6 +438,10 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 			#ifdef FAKEPKT
 			    time = rte_get_tsc_cycles();
 			    if ( time - time_last_pkt > stats_rate * FAKEPKT_DELAY ){
+			        /* Check dead children */
+			        if (nb_istance == 0)
+			            check_children();
+			            
 			        /* Need to send a keep-alive packet */
 			        time_last_pkt = rte_get_tsc_cycles();
 			        ret = gettimeofday(&tv, NULL);
@@ -505,6 +533,11 @@ static int main_loop_consumer(__attribute__((unused)) void * arg){
 
 
 		    if (nb_istance == 0){
+		    
+		        /* Check dead children */
+		        if (nb_istance == 0)
+		            check_children();
+		    
     		    printf("\n");
 			    for (i = 0; i < nb_sys_ports; i++){	
 				    rte_eth_stats_get(i, &stat);

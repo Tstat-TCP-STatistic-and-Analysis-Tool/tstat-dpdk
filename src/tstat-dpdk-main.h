@@ -9,6 +9,8 @@
 #include <libgen.h>
 #include <sys/queue.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <math.h>
 #include <sched.h>
 #include <pthread.h>

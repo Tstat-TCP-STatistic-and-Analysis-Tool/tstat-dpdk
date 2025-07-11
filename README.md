@@ -228,6 +228,10 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-e` option set **extra header bytes** to skip in order to arrive to the IP header. Example: set to 4 in case of a vlan tag. 
 
+`-v` option sets the NIC's flags for handling VLAN doubled-tagged traffic. Flags are: `RTE_ETH_RX_OFFLOAD_VLAN_STRIP`, `RTE_ETH_RX_OFFLOAD_QINQ_STRIP`,
+    `RTE_ETH_VLAN_STRIP_OFFLOAD`, `RTE_ETH_QINQ_STRIP_OFFLOAD`. 
+
+
 Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
 
 Below you have an example of this output

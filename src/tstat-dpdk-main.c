@@ -10,6 +10,7 @@ static int nb_sys_cores;
 static int extra_header; /* Extra Bytes to skip to handle e.g., VLAN tag (set 4 in this case)*/
 static int nb_istance;
 static int current_core;
+static int vlan_offload = 0;  /* Set to 1 to enable VLAN offload in the NIC, fundamental for doubled-tagged traffic */
 static int port_to_direction [MAX_PORTS]; 	/* This array indicates for each port, its direction.
 							0: No direction is set
 							2: Outgoing
@@ -695,6 +696,12 @@ static void init_port(int i) {
 			}	
 		}
 
+                
+		/* Modification to support double VLAN tag */
+        if (vlan_offload==1){
+            port_conf_temp.rxmode.offloads = RTE_ETH_RX_OFFLOAD_VLAN_STRIP | RTE_ETH_RX_OFFLOAD_QINQ_STRIP;
+            rte_eth_dev_set_vlan_offload(i, RTE_ETH_VLAN_STRIP_OFFLOAD | RTE_ETH_QINQ_STRIP_OFFLOAD); 
+        }
 
 		/* Configure device with 'nb_sys_cores' rx queues and 1 tx queue */
 		ret = rte_eth_dev_configure(i, nb_sys_cores, 1, &port_conf_temp);
@@ -816,13 +823,15 @@ static int parse_args(int argc, char **argv)
 	extra_header = 0;
 
 	/* Retrive arguments */
-	while ((option = getopt(argc, argv,"m:p:e:")) != -1) {
+	while ((option = getopt(argc, argv,"m:p:e:v")) != -1) {
         	switch (option) {
              		case 'm' : nb_sys_cores = atoi(optarg); 
                  		break;
              		case 'p' : nb_istance = atoi(optarg);
                  		break;
                     case 'e' : extra_header = atoi(optarg);
+                 		break;
+                    case 'v' : vlan_offload = 1;
                  		break;
              		default: return -1; 
 		}

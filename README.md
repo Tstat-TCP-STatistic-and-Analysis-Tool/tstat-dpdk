@@ -26,7 +26,7 @@ Tstat-DPDK Quick Start Guide
 
 This document is a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit ([DPDK](http://dpdk.org/)) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
 
-Tstat-DPDK consists of in a DPDK wrapper available [official SVN repository](http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/)
+Tstat-DPDK consists of in a DPDK wrapper for Tstat
 
 ```bash
     git clone git@github.com:Tstat-TCP-STatistic-and-Analysis-Tool/tstat-dpdk.git
@@ -91,18 +91,18 @@ popd
 
 ## 2.2 <a name="inst-tstat-dpdk"></a>Installing Tstat DPDK
 
-This step requires to compile both Tstat and the DPDK load-balancer application. They are both available under Tstat SVN repository.   
+This step requires to compile both Tstat and the DPDK load-balancer application. They are both available under Tstat Git repositories.   
 
 As previously pointed out, the DPDK wrapper acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with `$TSTATDPDK`.
 
 ## 2.2.1 <a name="comp-libtstat"></a>Installing last version of Tstat
 
-In this step you need to download and install the latest Tstat version from the official SVN repository, compile it, and install `libtstat`
+In this step you need to download and install the latest Tstat version from the official Git repository, compile it, and install `libtstat`
 
 ```bash
 	mkdir -p $HOME/tstat
 	pushd $HOME/tstat
-	  svn co http://tstat.polito.it/svn/software/tstat/trunk/
+	  git clone https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat trunk
 	popd
 	
 	pushd $HOME/tstat/trunk
@@ -137,7 +137,7 @@ This indicates both `libpcap` and `rrdtool` libraries have been correctly found 
 ```bash
 	mkdir -p $HOME/tstat
 	pushd $HOME/tstat
-	  svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/
+	  git clone https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat-dpdk
 	popd
 	
 	pushd $HOME/tstat/tstat-dpdk

@@ -29,7 +29,7 @@ This document is a quick start guide for Tstat-DPDK, a Tstat version supporting 
 Tstat-DPDK consists of in a DPDK wrapper available [official SVN repository](http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/)
 
 ```bash
-    svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/
+    git clone git@github.com:Tstat-TCP-STatistic-and-Analysis-Tool/tstat-dpdk.git
 ```
 
 Essentially, the DPDK wrapper acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
@@ -37,13 +37,13 @@ Essentially, the DPDK wrapper acts as **load balancer**, reading the aggregate t
 Here below we provide a step by step guide to setup the overall system.
 This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
 
-* official [Tstat Howto](http://tstat.polito.it/HOWTO.shtml)
+* official [Tstat Howto]([http://tstat.polito.it/HOWTO.shtml](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat))
 * official Intel [DPDK website](http://dpdk.org/doc) and [quick start](http://dpdk.org/doc/quick-start)
-* For information about this Readme file and Tstat-DPDK please write to [martino.trevisan@studenti.polito.it](mailto:martino.trevisan@studenti.polito.it) or the offical [Tstat mailing list](mailto:tstat@tlc.polito.it)
+* For information about this Readme file and Tstat-DPDK please write to [martino.trevisan@dia.units.it](mailto:martino.trevisan@dia.units.it)
 
 # 2. <a name="inst"></a>Installation
 
-A few general dependencies are required before to start
+A few general dependencies are required before starting
 
 * Intel DPDK requires  **Intel 82599 based network interfaces**
 * A Linux distribution with kernel >= 3.14 (we tested it on Debian)
@@ -60,23 +60,32 @@ A few general dependencies are required before to start
 
 ## 2.1 <a name="inst-dpdk"></a>Installing Intel DPDK
 
-We highly recommend to use **Install DPDK v1.8.0**. With other versions it is **NOT** guaranted to work properly.
+We highly recommend to use **Install DPDK v23.11.1**. With other versions it is **NOT** guaranted to work properly.
 
 ```bash
-	wget http://dpdk.org/browse/dpdk/snapshot/dpdk-1.8.0.tar.gz
-	tar xzf dpdk-1.8.0.tar.gz
-	cd dpdk-1.8.0
-	export RTE_SDK=$(pwd)
-	export RTE_TARGET=x86_64-native-linuxapp-gcc
-	make install T=$RTE_TARGET
-	cd ..
+DPDK_VERS="23.11.1"
+
+mkdir -p $HOME/dpdk
+wget -P $HOME/dpdk https://fast.dpdk.org/rel/dpdk-${DPDK_VERS}.tar.xz
+
+pushd $HOME/dpdk
+  tar xJf dpdk-${DPDK_VERS}.tar.xz
+  pushd dpdk-stable-${DPDK_VERS}
+    meson setup build
+    pushd build
+      ninja
+      sudo meson install
+      sudo ldconfig
+popd
+popd
+popd
 ```
 
 **NOTES:** 
 
 * `RTE_SDK` and `RTE_TARGET` are two environment variables used by DPDK to handle DPDK applications. These variables have to point respectively to DPDK installation directory and compilation target.
 * if you are running on a i686 machine, please use `i686-native-linuxapp-gcc` as `RTE_TARGET`
-* For more information we refer the reader to the [official documentation](http://dpdk.org/doc/guides-1.8/linux_gsg/index.html)
+* For more information we refer the reader to the [official documentation](http://dpdk.org/doc/)
 
 
 
@@ -91,12 +100,18 @@ As previously pointed out, the DPDK wrapper acts as a load balancer in the overa
 In this step you need to download and install the latest Tstat version from the official SVN repository, compile it, and install `libtstat`
 
 ```bash
-	svn co http://tstat.polito.it/svn/software/tstat/trunk/
-	cd $TSTATDPDK/trunk
-	./autogen.sh
-	./configure --enable-libtstat --enable-rrdthread
-	make
-	sudo make install
+	mkdir -p $HOME/tstat
+	pushd $HOME/tstat
+	  svn co http://tstat.polito.it/svn/software/tstat/trunk/
+	popd
+	
+	pushd $HOME/tstat/trunk
+	  ./autogen.sh
+	  ./configure  --enable-libtstat --enable-rrdthread --enable-ldns --enable-openssl
+	  echo "DEFINES += -DPACKET_STATS" >> tstat/Makefile.conf
+	  make
+	  sudo make install
+	popd
 ```
 
 ***Note:*** `configure` should print the following message is the set up is correct.
@@ -120,9 +135,17 @@ This indicates both `libpcap` and `rrdtool` libraries have been correctly found 
 
 ## 2.2.2 <a name="comp-dpdk-cluster"></a>Installing the DPDK Load Balancer
 ```bash
-	svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk 
-	cd $TSTATDPDK/tstat-dpdk
-	make
+	mkdir -p $HOME/tstat
+	pushd $HOME/tstat
+	  svn co http://tstat.polito.it/svn/software/tstat/branches/tstat-dpdk/
+	popd
+	
+	pushd $HOME/tstat/tstat-dpdk
+	  make
+	  pushd tools/rrd_merger
+	    make
+	  popd
+	popd
 ```
 
 # 3. <a name="conf"></a>System Configuration
@@ -166,14 +189,21 @@ In order to use the DPDK framework on a NIC we need to change the driver associa
 The following command enable DPDK drivers for all DPDK-supported NICs
 
 ```bash
+	IFACES=("0000:85:00.0" ... )
+	
+	#Loading modules
 	sudo modprobe uio
-	sudo insmod $RTE_SDK/$RTE_TARGET/kmod/igb_uio.ko
-	sudo $RTE_SDK/tools/dpdk_nic_bind.py --bind=igb_uio $($RTE_SDK/tools/dpdk_nic_bind.py --status | sed -rn 's,.* if=([^ ]*).*igb_uio *$,\1,p')
+	sudo modprobe vfio-pci
+	
+	#Binding interfaces to DPDK drivers
+	for IFACE in "${IFACES[@]}" ; do
+	    sudo $RTE_SDK/usertools/dpdk-devbind.py --bind=vfio-pci $IFACE
+	done
 ```
 
 To check if your network interfaces have been properly set by the Intel DPDK enviroment run:
 ```bash
-	sudo $RTE_SDK/tools/dpdk_nic_bind.py --status
+	sudo $RTE_SDK/usertools/dpdk-devbind.py --status
 ```
 You should get an output like this, which means that the first two interfaces are running under DPDK driver, while the third is not:
 ```
@@ -192,7 +222,6 @@ Network devices using kernel driver
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
 For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which include all Tstat plugins and log files, RRDTool output stats and. Fell free to configure the software as you like.
-For more information please refer to the [Tstat HOWTO](http://tstat.tlc.polito.it/HOWTO.shtml#libtstat_library)
 
 
 # 4. <a name="run"></a>Run Tstat-DPDK

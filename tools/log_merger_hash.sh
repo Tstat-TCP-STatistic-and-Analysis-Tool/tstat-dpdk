@@ -1,10 +1,10 @@
 #!/bin/bash
 # ABOUT
 # This script merges TSTAT log files in the specified directories.
-# It is possible to configure the meging algorithms (by starting time, ending time or concatenation).
+# It is possible to configure the merging algorithms (by starting time, ending time or concatenation).
 # It sorts all the log files in the specified directories, except for the current one ( the one with mod. time less than 60 min).
 # After the merging, the old logs can be deleted (this configurable).
-# Usage: log_merger.sh <salt> <out_dir> <in_dir1> <in_dir2> ... <in_dirN> 
+# Usage: log_merger_hash.sh <salt> <out_dir> <in_dir1> <in_dir2> ... <in_dirN> 
 # REQUIREMENTS: bc
 
 # PARAMETERS
@@ -23,7 +23,7 @@ compress=true
 # CODE
 # Parse arguments
 if (( $# < 4 )) ; then
-	echo "Usage: log_merger.sh <salt> <out_dir> <in_dir1> <in_dir2> ... <in_dirN> "
+	echo "Usage: log_merger_hash.sh <salt> <out_dir> <in_dir1> <in_dir2> ... <in_dirN> "
 	exit
 fi
 
@@ -47,7 +47,7 @@ fi
 
 # Get the first directory and the other ones
 first_input=$(echo $input_dirs | cut -d " " -f 1)
-other_input=$(echo $input_dirs | cut -d " " -f 2-8)
+other_input=$(echo $input_dirs | cut -d " " -f 2-)
 
 # Iterate over all the directories
 for dir1 in $(ls $first_input); do
@@ -191,7 +191,7 @@ for dir1 in $(ls $first_input); do
         fi
     fi
 
-	#6. Process log_mm_complete
+	#4. Process log_mm_complete
 	if [ -e "$first_input/$dir1/log_mm_complete" ]; then
 		if [ "$debug" -gt "0" ]; then
 			echo "   Merging log_mm_complete"
@@ -203,7 +203,7 @@ for dir1 in $(ls $first_input); do
 		
 		# Print 1 header 
 	    head -1 "$first_input/$dir1/log_mm_complete" > "${output_dir}/${output_tree}/log_mm_complete"
-		# Concat the files
+		# Merge by start time
 		tail -q -n+2 $files | sort -n -k23 | $hashlog log_mm_complete $salt 1 >> "${output_dir}/${output_tree}/log_mm_complete"
         # Compress if needed
         if $compress ; then
@@ -211,7 +211,7 @@ for dir1 in $(ls $first_input); do
         fi
 	fi
 
-	#10. Process log_dns_complete
+	#5. Process log_dns_complete
 	if [ -e "$first_input/$dir1/log_dns_complete" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_dns_complete"
@@ -231,7 +231,7 @@ for dir1 in $(ls $first_input); do
     fi
 
 
-	#11. Process log_tcp_periodic
+	#6. Process log_tcp_periodic
 	if [ -e "$first_input/$dir1/log_tcp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_tcp_periodic"
@@ -250,7 +250,7 @@ for dir1 in $(ls $first_input); do
         fi
     fi
     
-	#12. Process log_udp_periodic
+	#7. Process log_udp_periodic
 	if [ -e "$first_input/$dir1/log_udp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_udp_periodic"
@@ -269,7 +269,7 @@ for dir1 in $(ls $first_input); do
         fi
     fi
 
-	#13. Process traces
+	#8. Process traces
 	if [ -e "$first_input/$dir1/traces00" ]; then
 
 		if [ "$debug" -gt "0" ]; then

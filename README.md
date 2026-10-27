@@ -5,7 +5,7 @@ Tstat-DPDK Quick Start Guide
 * [2. Installation](#inst)
     * [2.1 Installing Intel DPDK](#inst-dpdk)
     * [2.2 Installing Tstat DPDK](#inst-tstat-dpdk)
-        * [2.2.1 Installing last version of Tstat](#comp-libtstat)
+        * [2.2.1 Installing Libtstat](#comp-libtstat)
         * [2.2.2 Installing the DPDK Load Balancer](#comp-dpdk-cluster)
 * [3. System Comfiguration](#conf)
     * [3.1 Reserve a large number of hugepages to DPDK](#conf-hugepage)
@@ -19,6 +19,7 @@ Tstat-DPDK Quick Start Guide
     * [4.3 Log Files Directory](#logs)
     * [4.4 System Performance Logs](#logs-perf)
     * [4.5 Advanced load balancing](#load-balance)
+    * [4.6 Merging the logs of the instances](#merge)
 
 
 
@@ -37,7 +38,7 @@ Essentially, the DPDK wrapper acts as **load balancer**, reading the aggregate t
 Here below we provide a step by step guide to setup the overall system.
 This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
 
-* official [Tstat Howto]([http://tstat.polito.it/HOWTO.shtml](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat))
+* the [Tstat wiki](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki)
 * official Intel [DPDK website](http://dpdk.org/doc) and [quick start](http://dpdk.org/doc/quick-start)
 * For information about this Readme file and Tstat-DPDK please write to [martino.trevisan@dia.units.it](mailto:martino.trevisan@dia.units.it)
 
@@ -46,7 +47,7 @@ This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat
 A few general dependencies are required before starting
 
 * Intel DPDK requires  **Intel 82599 based network interfaces**
-* A Linux distribution with kernel >= 3.14 (we tested it on Debian)
+* A Linux distribution with kernel >= 3.14 (we tested it on Ubuntu)
 * Linux kernel headers: to install run
 ```bash
     sudo apt-get install linux-headers-$(uname -r)
@@ -55,7 +56,13 @@ A few general dependencies are required before starting
 * Several packages needed before installing this software:
 
   * DPDK needs: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libstdc++.i686, glibc-devel.i686, python`
-  * Tstat needs: `libpcap-dev, rrdtool, librrd-dev, cpufrequtils, autoconf, libtool`
+  * Tstat needs: `build-essential, libpcap-dev, libldns-dev, libssl-dev, librrd-dev`
+  * The system configuration and the tools need: `cpufrequtils, libxml2-dev` (for `rrd_merger`), `bc` and `wireshark-common` (`mergecap`, for the log mergers)
+
+  On Ubuntu, the Tstat dependencies can be installed with:
+```bash
+    sudo apt-get install build-essential libpcap-dev libldns-dev libssl-dev librrd-dev
+```
 
 
 ## 2.1 <a name="inst-dpdk"></a>Installing Intel DPDK
@@ -95,9 +102,15 @@ This step requires to compile both Tstat and the DPDK load-balancer application.
 
 As previously pointed out, the DPDK wrapper acts as a load balancer in the overall system. From one side it interfaces with the DPDK framework, while on the other it delivers data packets to Tstat processes. For this latter functionality it relies on LibTstat. In the following we refer to the root folder of the repository with `$TSTATDPDK`.
 
-## 2.2.1 <a name="comp-libtstat"></a>Installing last version of Tstat
+## 2.2.1 <a name="comp-libtstat"></a>Installing Libtstat
 
-In this step you need to download and install the latest Tstat version from the official Git repository, compile it, and install `libtstat`
+In this step you need to download the latest Tstat version from the official Git repository, compile it as a library (`libtstat`) and install it.
+Tstat is built with a plain Makefile. Two build options, both enabled by default, are needed by Tstat-DPDK:
+
+* `RRD_THREADED` writes the RRD files from a separate thread, so that RRD updates do not stall the packet processing
+* `PACKET_STATS` adds the statistics on the first segments of each flow (advanced set of `log_tcp_complete` and extra columns of `log_udp_complete`)
+
+Do not set them to `0` when building Libtstat for Tstat-DPDK.
 
 ```bash
 	mkdir -p $HOME/tstat
@@ -106,32 +119,16 @@ In this step you need to download and install the latest Tstat version from the 
 	popd
 	
 	pushd $HOME/tstat/trunk
-	  ./autogen.sh
-	  ./configure  --enable-libtstat --enable-rrdthread --enable-ldns --enable-openssl
-	  echo "DEFINES += -DPACKET_STATS" >> tstat/Makefile.conf
-	  make
+	  make all libtstat
 	  sudo make install
+	  sudo ldconfig
 	popd
 ```
 
-***Note:*** `configure` should print the following message is the set up is correct.
-```
-[...]
--------------------------------------------------
-  tstat Version 3.0
-  -lpcap -lpthread -lm  -lrrd
-
-  Prefix: '/usr/local'
-
-  Package features:
-    - pcap      yes
-    - zlib      no
-    - rrd       yes
-    - libtstat  yes
-    - rrdthread yes
---------------------------------------------------
-```
-This indicates both `libpcap` and `rrdtool` libraries have been correctly found and Tstat will be compiled as a library with rrdthread feature active.
+`make install` installs the `tstat` executable in `/usr/local/bin`, and `libtstat.so`, `libtstat.h` and `libtstat.pc` under `/usr/local/lib`, `/usr/local/include` and `/usr/local/lib/pkgconfig`.
+The installation prefix can be changed with `sudo make install PREFIX=/opt/tstat`.
+Run `tstat -v` to check the installed version.
+For more details, see the [Installation](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki/Installation) page of the Tstat wiki.
 
 ## 2.2.2 <a name="comp-dpdk-cluster"></a>Installing the DPDK Load Balancer
 ```bash
@@ -221,21 +218,21 @@ Network devices using kernel driver
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
-For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.) which include all Tstat plugins and log files, RRDTool output stats and. Fell free to configure the software as you like.
+For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.), one for each instance, which set the internal networks (`subnets.txt`), the log files to produce (`runtime.conf`), the RRD output (`rrd.conf`) and the output directories. Feel free to configure the software as you like: the available options are described in the [Tstat wiki](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki).
 
 
 # 4. <a name="run"></a>Run Tstat-DPDK
 
 **Note:** if, when running Tstat-DPDK, you encounter an error like this
 ```
-    error while loading shared libraries: libtstat.so.0: cannot open shared object file: No such file or directory
+    error while loading shared libraries: libtstat.so.1: cannot open shared object file: No such file or directory
 ```
 make sure the environment  finds `libtstat`  shared object by running:
 ```bash
     export LD_LIBRARY_PATH=/usr/local/lib
 ```
 
-Sometimes it's necessary to make the changes permanent by running `ldconfig` command, but this is dependent on your setup (e.g. you are using a remote terminal via `ssh`)
+or update the cache of the dynamic linker with `sudo ldconfig` (needed once after installing Libtstat).
 
 ## 4.1 <a name="start"></a>Start Tstat instances
 
@@ -345,3 +342,17 @@ To perform this action you have to modify few lines in the source code and then 
 Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
 
 **3.** Recompile the loadbalancer just typing `make clean && make` in `$TSTATDPDK/tstat-dpdk/` folder.
+
+## 4.6 <a name="merge"></a>Merging the logs of the instances
+Since each Tstat instance writes its own logs, the directory `$TSTATDPDK/tstat-dpdk/tools` contains two scripts to merge them, which can be run periodically (e.g., with `cron`):
+
+```bash
+	tools/log_merger.sh <out_dir> tstat_log00 tstat_log01 ...
+	tools/log_merger_hash.sh <salt> <out_dir> tstat_log00 tstat_log01 ...
+```
+
+For each hourly directory present in all the instances and older than one hour, the scripts merge each log file, sorting the rows by time (start time, or end time for `log_tcp_complete` and `log_tcp_nocomplete`; the rows of `log_udp_complete` are only concatenated), merge the packet level traces in `traces00` with `mergecap`, and compress the results with `gzip` in `<out_dir>/<year>/<month>/`. By default the merged directories are deleted: see the parameters at the beginning of the scripts.
+
+`log_merger_hash.sh` also replaces the IP addresses anonymized by Tstat (Crypto-PAn, option `-Y`) with salted SHA-256 hashes, using `tools/hash-log.py`. It does not process `log_http_complete`, which is discarded.
+
+The RRD databases of the instances can be merged with `tools/rrd_merger/rrd_merger <out_dir> <in_dir1> <in_dir2> ...`.

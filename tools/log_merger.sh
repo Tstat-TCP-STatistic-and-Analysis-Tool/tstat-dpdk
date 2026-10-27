@@ -1,7 +1,7 @@
 #!/bin/bash
 # ABOUT
 # This script merges TSTAT log files in the specified directories.
-# It is possible to configure the meging algorithms (by starting time, ending time or concatenation).
+# It is possible to configure the merging algorithms (by starting time, ending time or concatenation).
 # It sorts all the log files in the specified directories, except for the current one ( the one with mod. time less than 60 min).
 # After the merging, the old logs can be deleted (this configurable).
 # Usage: log_merger.sh <out_dir> <in_dir1> <in_dir2> ... <in_dirN> 
@@ -40,7 +40,7 @@ fi
 
 # Get the first directory and the other ones
 first_input=$(echo $input_dirs | cut -d " " -f 1)
-other_input=$(echo $input_dirs | cut -d " " -f 2-8)
+other_input=$(echo $input_dirs | cut -d " " -f 2-)
 
 # Iterate over all the directories
 for dir1 in $(ls $first_input); do
@@ -205,27 +205,7 @@ for dir1 in $(ls $first_input); do
     fi
 
 
-	#5. Process log_video_complete
-	if [ -e "$first_input/$dir1/log_video_complete" ]; then
-	    if [ "$debug" -gt "0" ]; then
-		    echo "   Merging log_video_complete"
-	    fi
-	    files=""
-	    for indir in $input_dirs ; do
-		    files="${files} ${dir_to_process[$indir]}/log_video_complete"
-	    done
-	    # Print 1 header 
-	    head -1 "$first_input/$dir1/log_video_complete" > "${output_dir}/${output_tree}/log_video_complete"
-	    # Merge by end time
-		tail -q -n+2 $files | sort -n -k30 >> "${output_dir}/${output_tree}/log_video_complete"
-        # Compress if needed
-        if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_video_complete" 2>/dev/null
-        fi
-    fi
-
-
-	#6. Process log_mm_complete
+	#5. Process log_mm_complete
 	if [ -e "$first_input/$dir1/log_mm_complete" ]; then
 		if [ "$debug" -gt "0" ]; then
 			echo "   Merging log_mm_complete"
@@ -247,62 +227,7 @@ for dir1 in $(ls $first_input); do
 
 
 
-	#7. Process log_skype_complete
-	if [ -e "$first_input/$dir1/log_skype_complete" ]; then
-		if [ "$debug" -gt "0" ]; then
-			echo "   Merging log_skype_complete"
-		fi
-		files=""
-		for indir in $input_dirs ; do
-			files="${files} ${dir_to_process[$indir]}/log_skype_complete"
-		done
-		# Concat the files
-	    tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_skype_complete"
-        # Compress if needed
-        if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_skype_complete" 2>/dev/null
-        fi
-	fi
-
-
-
-	#8. Process log_chat_complete
-	if [ -e "$first_input/$dir1/log_chat_complete" ]; then
-		if [ "$debug" -gt "0" ]; then
-			echo "   Merging log_chat_complete"
-		fi
-		files=""
-		for indir in $input_dirs ; do
-			files="${files} ${dir_to_process[$indir]}/log_chat_complete"
-		done
-		# Concat the files
-		tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_complete"
-        # Compress if needed
-        if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_chat_complete" 2>/dev/null
-        fi
-	fi
-
-
-
-	#9. Process log_chat_messages
-	if [ -e "$first_input/$dir1/log_chat_messages" ]; then
-		if [ "$debug" -gt "0" ]; then
-			echo "   Merging log_chat_messages"
-		fi
-		files=""
-		for indir in $input_dirs ; do
-			files="${files} ${dir_to_process[$indir]}/log_chat_messages"
-		done
-		# Concat the files
-		tail -q -n+1 $files >> "${output_dir}/${output_tree}/log_chat_messages"
-        # Compress if needed
-        if $compress ; then
-            gzip -f "${output_dir}/${output_tree}/log_chat_messages" 2>/dev/null
-        fi
-	fi
-
-	#10. Process log_dns_complete
+	#6. Process log_dns_complete
 	if [ -e "$first_input/$dir1/log_dns_complete" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_dns_complete"
@@ -322,7 +247,7 @@ for dir1 in $(ls $first_input); do
     fi
 
 
-	#11. Process log_tcp_periodic
+	#7. Process log_tcp_periodic
 	if [ -e "$first_input/$dir1/log_tcp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_tcp_periodic"
@@ -341,7 +266,7 @@ for dir1 in $(ls $first_input); do
         fi
     fi
     
-	#12. Process log_udp_periodic
+	#8. Process log_udp_periodic
 	if [ -e "$first_input/$dir1/log_udp_periodic" ]; then
 	    if [ "$debug" -gt "0" ]; then
 		    echo "   Merging log_udp_periodic"
@@ -360,7 +285,7 @@ for dir1 in $(ls $first_input); do
         fi
     fi
 
-	#13. Process traces
+	#9. Process traces
 	if [ -e "$first_input/$dir1/traces00" ]; then
 
 		if [ "$debug" -gt "0" ]; then

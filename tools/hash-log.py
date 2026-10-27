@@ -2,7 +2,7 @@
 import sys
 import hashlib
 import ipaddress
-from cachetools import cached
+from functools import lru_cache
 
 help="""
 It reads a Tstat log from stdin and outputs to stdout.
@@ -16,8 +16,8 @@ The user must specify the <log> argument. This tool supports Tstat logs:
 - log_udp_complete
 - log_dns_complete
 - log_mm_complete
-- log_periodic_complete
-- log_periodic_udp_complete
+- log_tcp_periodic
+- log_udp_periodic
 The hash is salted using the <salt> argument.
 The tool is a noop if <active> is 0.
 """
@@ -92,7 +92,7 @@ def main():
         fields[s_ip_col] = s_ip
         print(" ".join(fields), end="")
 
-@cached(cache ={}) 
+@lru_cache(maxsize=1000000)
 def anon(ip,is_crypto,salt):
 
     # Operate only on already anonymized addresses

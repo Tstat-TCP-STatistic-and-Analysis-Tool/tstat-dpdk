@@ -17,9 +17,7 @@ Tstat-DPDK Quick Start Guide
     * [4.1 Start Tstat Instances](#start)
     * [4.2 Stop Tstat Instances](#stop)
     * [4.3 Log Files Directory](#logs)
-    * [4.4 System Performance Logs](#logs-perf)
-    * [4.5 Advanced load balancing](#load-balance)
-    * [4.6 Merging the logs of the instances](#merge)
+    * [4.4 Merging the logs of the instances](#merge)
 
 
 
@@ -218,7 +216,7 @@ Network devices using kernel driver
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
-For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.), one for each instance, which set the internal networks (`subnets.txt`), the log files to produce (`runtime.conf`), the RRD output (`rrd.conf`) and the output directories. Feel free to configure the software as you like: the available options are described in the [Tstat wiki](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki).
+For instance, in `$TSTATDPDK/tstat-dpdk/tstat-conf` we provide a set of example configuration files (`tstat00.conf`, `tstat01.conf`, etc.), one for each instance, which set the internal networks (`subnets.txt`), the log files to produce (`runtime.conf`), the RRD output (`rrd.conf`) and the output directories. By default, instance `i` reads `tstat-conf/tstatXX.conf` (with `XX` = `i` on two digits) relative to the current directory: you can use other files with the `-c` option (see [Start Tstat instances](#start)). Feel free to configure the software as you like: the available options are described in the [Tstat wiki](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki).
 
 
 # 4. <a name="run"></a>Run Tstat-DPDK
@@ -236,7 +234,10 @@ or update the cache of the dynamic linker with `sudo ldconfig` (needed once afte
 
 ## 4.1 <a name="start"></a>Start Tstat instances
 
-First of all, you need to decide how many Tstat instances you want to run in parallel. You cannot set up more instances than available cores.
+First of all, you need to decide how many Tstat instances you want to run in parallel.
+Each instance is a process with two threads, each one running on a dedicated core: the *producer* reads the packets of the instance from the NICs, and the *consumer* passes them to Tstat.
+Instance `i` uses cores `2*i` (producer) and `2*i+1` (consumer), so `N` instances use cores `0` ... `2N-1` and you cannot run more instances than half of the available cores.
+Avoid running other CPU intensive processes on these cores.
 
 If you want to start 2 instances, type:
 ```bash
@@ -250,7 +251,9 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-m` option controls the **number of pararallel instances**.
 
-`-c` and `-n` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
+`-c <format>` sets the **Tstat configuration file** of each instance. The argument is a `printf`-like format, where `%d` (or, e.g., `%02d`) is replaced by the number of the instance; it must contain exactly one such conversion (use `%%` for a literal `%`). The default is `tstat-conf/tstat%02d.conf`, i.e., `tstat-conf/tstat00.conf`, `tstat-conf/tstat01.conf`, etc., relative to the current directory. For example, `-c /etc/tstat/instance%d.conf` uses `/etc/tstat/instance0.conf`, `/etc/tstat/instance1.conf`, etc.
+
+The `-c` and `-n` options before `--` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
 
 `-e` option set **extra header bytes** to skip in order to arrive to the IP header. Example: set to 4 in case of a vlan tag. 
 
@@ -258,12 +261,13 @@ It might be useful to run this command detached from the shell (ending it with `
     `RTE_ETH_VLAN_STRIP_OFFLOAD`, `RTE_ETH_QINQ_STRIP_OFFLOAD`. 
 
 
-Approximatively every second, the DPDK load-balancer prints statistics. This includes avg, max, stdev of per packet processing time, number of TCP and UDP flows closed, incoming rate in Mpps, the eventual packet loss rate (in case of losses),  and utilization of the internal buffers used by Tstat-DPDK to manage packet acquisition.
+Approximatively every second, Tstat-DPDK prints statistics: the rate, received, missed and erroneous packets of each port, and the packets processed and dropped by each instance, with the utilization of the buffer between its producer and consumer.
 
 Below you have an example of this output
 ```
-Instance: 0 Avg: 1.023us Max: 35.127us StdDev: 14.452 TCP cl.: 42 UDP cl.: 213 Rate: 0.897Mpps, Loss: 0Mpps Buffer occupation:   0%
-Instance: 1 Avg: 1.045us Max: 44.345us StdDev: 45.713 TCP cl.: 37 UDP cl.: 175 Rate: 0.813Mpps, Loss: 0Mpps Buffer occupation:   0%
+TIME: 2025-03-21 16:25:01 - PORT:  0 Rate: 2410.312 Mbps 0.412 Mpps Rx:   412310 Missed:        0 Err:        0 Tot:   412310 Perc Drop:  0.000%
+    INSTANCE:  0 Processed:   206512 Drop:        0 Tot:   206512 Buffer Occupancy:  0.000%
+    INSTANCE:  1 Processed:   205798 Drop:        0 Tot:   205798 Buffer Occupancy:  0.000%
 ```
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
@@ -300,50 +304,7 @@ If you want to ovverride this setting you can use the `-s <logdir>` option in th
 
 RRD database directory is specified in the configuration files of Tstat, so you can configure its location by means of the `-r <rrd_dir>` option (recall that each instance must have its different database in different directories).
 
-## 4.4 <a name="logs-perf"></a>System Performance Logs
-In the directory `$TSTATDPDK/tstat-dpdk/tstat-stats` there is a set of file called `statsXX.txt`.
-Each instance writes in its own file (the `XX` in the name of the file is its number) statistics while it is running.
-
-This kind of output can be disabled by editing the source code -- 5th line of `src/tstat-dpdk-params.h` and commenting the `#define DEBUG` statement.
-
-## 4.5 <a name="load-balance"></a>Advanced load balancing
-It is possible to configure the load balancing rule to optimize particular network setups.
-
-The default load balancing rule ensures that packets belonging to the same flow will be processed by the same Tstat instance.
-In this way Tstat can produce per-flow consistent statistics.
-Nevertheless the same host can appear in different Tstat instances for different TCP/UDP connections.
-
-If you set up Tstat-DPDK in the links connecting a local network to the internet, you can setup an advanced load balancing rule.
-Since it might be useful to have **the traffic of the same local network host to appear always in the same Tstat instance**, you can configure load balancing as follows:
-
-* The interface sniffing the traffic from the **outgoing link** loadbalances the traffic according to **source IP** address.
-* The interface sniffing the traffic from the **incoming link** loadbalances the traffic according to **destination IP** address.
-
-To perform this action you have to modify few lines in the source code and then recompile as follows:
-
-**1.** In `$TSTATDPDK/tstat-dpdk/src/tstat-dpdk-params.h` file, find these lines
-
-```
-	/* Use the next 2 variables to set up port direction */
-	static struct port_dir port_directions [] = {};
-	static uint8_t nb_port_directions = 0;
-```
-**2.** Modify them to respect your network configuration, like in this example:
-
-```
-	/* Use the next 2 variables to set up port direction */
-	static struct port_dir port_directions [] = {
-		{ .pci_address = "01:00.0", .is_out=0 },
-		{ .pci_address = "01:00.1", .is_out=1 },
-	};
-	static uint8_t nb_port_directions = 2;
-```
-
-Where each entry in `port_directions` array describes a NIC indicating its PCI address (in the shown format) and either it is incoming or outgoing.
-
-**3.** Recompile the loadbalancer just typing `make clean && make` in `$TSTATDPDK/tstat-dpdk/` folder.
-
-## 4.6 <a name="merge"></a>Merging the logs of the instances
+## 4.4 <a name="merge"></a>Merging the logs of the instances
 Since each Tstat instance writes its own logs, the directory `$TSTATDPDK/tstat-dpdk/tools` contains two scripts to merge them, which can be run periodically (e.g., with `cron`):
 
 ```bash

@@ -1,101 +1,49 @@
-/* IN THIS FILE THERE ARE THE CONSTANTS OF TSTAT-DPDK*/
+/* Compile-time parameters of Tstat-DPDK */
 
-/* If you define DEBUG, stats will be printed */
-#define DEBUG
-/* If you define FAKEPKT, a fake packet will be given to tstat every FAKEPKT_DELAY seconds of inactivity*/
-#define FAKEPKT
-#define FAKEPKT_DELAY 1
-/* If you define DEBUG_DEADLINE, scheduler will be monitored and missed deadlines printed */
-//#define DEBUG_DEADLINE
-/* If you want to monitor the time elapsed in rte_eth_rx_burst */
-#define DEBUG_RX_BURST
-/* If you define SUM_IP, progressive numbers will be added to ip addresses to packets with different port */
-//#define SUM_IP
-/* If you define OFFLOAD_CPU, tstat-dpdk will stop polling for the packets in low traffic conditions */
+/* If you define OFFLOAD_CPU, the consumer sleeps SLEEP_TIME_US when no packet is available,
+   instead of polling the ring continuously */
 #define OFFLOAD_CPU
+#define SLEEP_TIME_US 1000
 
-/* Constants of the system */
-#define TSTAT_CONF_FILE "tstat-conf/tstat00.conf"		//Tstat directories
-#define TSTAT_LOG_DIR "tstat-logs/tstat00.log"
+/* Per-instance files: %02d is replaced by the number of the instance */
+#define TSTAT_CONF_FILE "tstat-conf/tstat%02d.conf"	/* Tstat configuration, default of the -c option */
+#define TSTAT_LOG_DIR   "tstat-logs/tstat%02d.log"	/* Default log directory (overridden by -s in TSTAT_CONF_FILE) */
 
-#define SCHED_RUNTIME_NS     (   1500*1000)			// Scheduling parameters in ns: 	activity time:	1000 us
-#define SCHED_TOTALTIME_NS   ( 2000*1000 )			//					period time:	2000 us
-#define CPU_SET_NAME "tstat-dpdk00"
-#define SLEEP_TIME_US 1000					// The time (in us) the consumer thread sleeps when finding empty buffer, if you enable OFFLOAD_CPU
-
-#define MEMPOOL_NAME "cluster_mem_pool"				// Name of the NICs' mem_pool, useless comment....
-#define MEMPOOL_ELEM_NB (524288-1) 				// Must be greater than RX_QUEUE_SZ * RX_QUEUE_NB * nb_sys_ports; Should also be (2^n - 1). 
-#define MEMPOOL_ELEM_SZ 4096  					// Power of two greater than 1500. Use 4096 otherwise get segmentation
-#define MEMPOOL_CACHE_SZ 0  					// MUST BE 0 WITH SCHED_DEADLINE, otherwise the driver wil crash !!
-#define MAX_QUEUES 16
+#define MAX_INSTANCES 16
 #define MAX_PORTS 16
 
-#define INTERMEDIATERING_NAME "intermedate_ring"
+/* Packet buffers: one mempool for each instance */
+#define MEMPOOL_NAME "cluster_mem_pool"
+#define MEMPOOL_ELEM_NB (524288-1)	/* Must be greater than RX_QUEUE_SZ * nb_ports; should be (2^n - 1) */
+#define MEMPOOL_ELEM_SZ 4096		/* Power of two greater than 1500, so that the NIC does not segment packets */
+#define MEMPOOL_CACHE_SZ 0		/* The threads are not EAL lcores, so they cannot use a mempool cache */
+
+/* Ring between the producer and the consumer of each instance */
+#define INTERMEDIATERING_NAME "intermediate_ring"
 #define INTERMEDIATERING_SZ (MEMPOOL_ELEM_NB+1)
 
-#define RX_QUEUE_SZ 4096					// The size of rx queue. Max is 4096 and is the one you'll have best performances with. Use lower if you want to use Burst Bulk Alloc.
-#define TX_QUEUE_SZ 256						// Unused, you don't tx packets
-#define PKT_BURST_SZ 32					// Unfortunately it is 32 in DPDK 18
-
-#define STDEV_THRESH 1		       				// define the threshold for calculating the stdev in millisecs. Samples higher than STDEV_THRESH will be ignored..
-#define STAT_FILE "tstat-stats/stats00.txt"			// define the file statistics are put in. Every instance has got statsX.txt file
-
-/* Use the next 2 variables to set up port direction, e.g.
-
-	static struct port_dir port_directions [] = {
-		{ .pci_address = "02:00.1", .is_out=0 },
-		{ .pci_address = "02:00.0", .is_out=1 },
-	};
-	static uint8_t nb_port_directions = 2;*/
+#define RX_QUEUE_SZ 4096		/* Size of the rx queues: 4096 is the maximum and gives the best performance */
+#define TX_QUEUE_SZ 256			/* Unused, packets are never transmitted */
+#define PKT_BURST_SZ 32			/* Packets read with each rte_eth_rx_burst() */
 
 
-static struct port_dir port_directions [] = {};
-static uint8_t nb_port_directions = 0;
-
-/* RSS symmetrical 40 Byte seed, according to "Scalable TCP Session Monitoring with Symmetric Receive-side Scaling" (Shinae Woo, KyoungSoo Park from KAIST)  */
-// THIS IS FOR X710, must be 52B
-// according to https://dev.dpdk.narkive.com/AIj6ALhm/dpdk-dev-symmetry-for-tcp-packets-on-x710-intel
-uint8_t rss_seed_x710 [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			            0x6d, 0x5a, 0x6d, 0x5a
+/* RSS symmetrical 40 Byte seed, according to "Scalable TCP Session Monitoring with Symmetric Receive-side Scaling" (Shinae Woo, KyoungSoo Park from KAIST) */
+static uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
 };
 
-// This is for older 82599 cards, 40B
-uint8_t rss_seed [] = {	0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-			0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
+/* The same symmetrical seed, 52 Byte long as required by X710 cards
+   (https://dev.dpdk.narkive.com/AIj6ALhm/dpdk-dev-symmetry-for-tcp-packets-on-x710-intel).
+   Unused: replace rss_seed with it when using X710 cards */
+static uint8_t rss_seed_x710 [] __rte_unused = {
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
+				0x6d, 0x5a, 0x6d, 0x5a
 };
-
-
-uint8_t rss_seed_alternative [] = {	0x6d, 0x5a, 0x6d, 0x5b, 0x6d, 0x5a, 0x6d, 0x5b,
-					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a,
-					0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a, 0x6d, 0x5a
-};
-
-/* This seed is to load balance only respect destination IP, according to me (Martino Trevisan, from nowhere particular) */
-uint8_t rss_seed_dst_ip [] = { 	
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-/* This seed is to load balance only respect source IP, according to me (Martino Trevisan, from nowhere particular) */
-uint8_t rss_seed_src_ip [] = { 	
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-
-
-

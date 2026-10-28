@@ -9,7 +9,7 @@ SRCS-y := src/tstat-dpdk-main.c
 
 PKGCONF ?= pkg-config
 
-LDFLAGS += -ltstat -lpcap -lpthread -lm
+LDFLAGS += -ltstat -lpcap -lpthread
 
 # Build using pkg-config variables if possible
 ifneq ($(shell $(PKGCONF) --exists libdpdk && echo 0),0)

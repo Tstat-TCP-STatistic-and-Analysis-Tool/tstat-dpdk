@@ -27,6 +27,8 @@ static const char * conf_format;	/* -c: format of the Tstat configuration file, 
 
 /* System */
 static int nb_ports;
+static int max_link_speed_mbps = 0; /* Fastes NIC, used for OFFLOAD_POLLING */
+static int offload_polling_sleep_us = 0;
 static struct rte_mempool * pktmbuf_pool [MAX_INSTANCES];
 static struct rte_ring * rings [MAX_INSTANCES];
 static pid_t children [MAX_INSTANCES];
@@ -108,6 +110,8 @@ int main(int argc, char **argv)
 		init_port(i);
 	for (i = 0; i < nb_ports; i++)
 		rte_eth_stats_reset(i);
+    /* Compute how long should sleep to avoid queues to get full */
+    offload_polling_sleep_us = (nb_instances*RX_QUEUE_SZ*AVG_PKT_SIZE*8)/(max_link_speed_mbps*OFFLOAD_POLLING_GUARD);
 
 	/* Fork the children: from now on, 'instance' identifies the process */
 	start_instances();
@@ -274,9 +278,12 @@ static void init_port(int port)
 
 	/* Print link status */
 	rte_eth_link_get_nowait(port, &link);
-	if (link.link_status)
+	if (link.link_status){
 		printf("\tLink Up - speed %u Mbps - %s\n", (unsigned)link.link_speed,
 		       (link.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ? "full-duplex" : "half-duplex");
+        if (link.link_speed >max_link_speed_mbps)
+            max_link_speed_mbps=link.link_speed;
+    }
 	else
 		printf("\tLink Down\n");
 
@@ -328,17 +335,24 @@ static void * producer_loop(__rte_unused void * arg)
 {
 	struct rte_mbuf * burst [PKT_BURST_SZ];
 	struct timeval t_last, t_pkt;
-	int port, i, nb_rx, nb_enq;
+	int port, i, nb_rx, nb_enq, nb_empty_ifaces;
 	long diff_usec;
+    static uint64_t start_time, end_time, elapsed;
 
 	gettimeofday(&t_last, NULL);
 
 	while (!stop){
+
+        nb_empty_ifaces = 0;
+        start_time = rte_get_tsc_cycles();
+
 		for (port = 0; port < nb_ports; port++){
 
 			nb_rx = rte_eth_rx_burst(port, instance, burst, PKT_BURST_SZ);
 			if (nb_rx == 0)
 				continue;
+            if (nb_rx<PKT_BURST_SZ)
+                nb_empty_ifaces++;
 
 			/* The packets of the burst are timestamped evenly between the previous burst and now */
 			t_pkt = t_last;
@@ -364,6 +378,18 @@ static void * producer_loop(__rte_unused void * arg)
 				rte_pktmbuf_free(burst[i]);
 			nb_drop += nb_rx - nb_enq;
 		}
+
+        /* If all queues have are now empty, sleep for remaining time */
+        end_time = rte_get_tsc_cycles();
+        #ifdef OFFLOAD_POLLING
+        if (nb_empty_ifaces==nb_ports){
+            elapsed = (end_time - start_time)*1000000/rte_get_tsc_hz();
+            if (elapsed < offload_polling_sleep_us){
+                usleep( offload_polling_sleep_us - elapsed);
+            }
+
+        }
+        #endif
 	}
 
 	return NULL;

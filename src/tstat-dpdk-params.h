@@ -5,6 +5,13 @@
 #define OFFLOAD_CPU
 #define SLEEP_TIME_US 1000
 
+/* Sleep for some time if all interfaces have the queue empty.
+   Assumes to sleep an amount of time to avoid queues to fet full */
+#define OFFLOAD_POLLING
+#define AVG_PKT_SIZE 1000 /* Average packet size estimated to compute sleep time */
+#define OFFLOAD_POLLING_GUARD 4 /* Division factor for sleep safeguard */
+/* sleep_time = nb_queues*queue_size*avg_pkt_size*8/line_rate_bitrate */
+
 /* Per-instance files: %02d is replaced by the number of the instance */
 #define TSTAT_CONF_FILE "tstat-conf/tstat%02d.conf"	/* Tstat configuration, default of the -c option */
 #define TSTAT_LOG_DIR   "tstat-logs/tstat%02d.log"	/* Default log directory (overridden by -s in TSTAT_CONF_FILE) */

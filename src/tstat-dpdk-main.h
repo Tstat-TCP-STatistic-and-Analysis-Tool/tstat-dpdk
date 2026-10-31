@@ -14,6 +14,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/mman.h>
+#include <stdarg.h>
+#include <inttypes.h>
 #include <sys/wait.h>
 #include <arpa/inet.h>
 

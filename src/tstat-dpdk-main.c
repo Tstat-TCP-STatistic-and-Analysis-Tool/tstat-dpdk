@@ -37,9 +37,17 @@ static volatile sig_atomic_t stop = 0;
 /* State of this instance */
 static int instance;			/* Number of this instance */
 static struct rte_ring * ring;		/* Ring from the producer to the consumer */
-static uint64_t nb_packets = 0;		/* Packets received by the producer */
-static uint64_t nb_drop = 0;		/* Packets dropped by the producer, because the ring is full */
 static uint64_t nb_tstat_packets = 0;	/* Packets passed to Libtstat */
+
+/* Counters of the producer of each instance, in memory shared among the processes:
+   the producer writes them, the parent reads them to print the stats */
+struct instance_counters {
+	uint64_t rx_pkts;	/* Packets received */
+	uint64_t rx_bytes;	/* Bytes received */
+	uint64_t drops;		/* Packets dropped, because the ring is full */
+	uint64_t ring_max;	/* Max number of packets in the ring, reset by the parent every second */
+} __rte_cache_aligned;
+static struct instance_counters * counters;
 
 static int parse_args(int argc, char **argv);
 static int check_conf_format(const char * format);
@@ -52,8 +60,8 @@ static void consumer_loop(void);
 static void process_packet(struct rte_mbuf * m);
 static void check_children(void);
 static void print_final_stats(void);
-static void stats_init(void);
-static void stats_update(void);
+static void display_init(void);
+static void display_update(void);
 
 
 int main(int argc, char **argv)
@@ -110,8 +118,13 @@ int main(int argc, char **argv)
 		init_port(i);
 	for (i = 0; i < nb_ports; i++)
 		rte_eth_stats_reset(i);
-    /* Compute how long should sleep to avoid queues to get full */
-    offload_polling_sleep_us = (nb_instances*RX_QUEUE_SZ*AVG_PKT_SIZE*8)/(max_link_speed_mbps*OFFLOAD_POLLING_GUARD);
+	/* Compute how long should sleep to avoid queues to get full. If no link is up, never sleep */
+	if (max_link_speed_mbps > 0)
+		offload_polling_sleep_us = (nb_instances*RX_QUEUE_SZ*AVG_PKT_SIZE*8)/(max_link_speed_mbps*OFFLOAD_POLLING_GUARD);
+
+	/* Counters shared among the processes: created before the fork, so the children inherit them */
+	counters = mmap(NULL, nb_instances * sizeof(*counters), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if (counters == MAP_FAILED) FATAL_ERROR("Cannot allocate the shared counters: %s", strerror(errno));
 
 	/* Fork the children: from now on, 'instance' identifies the process */
 	start_instances();
@@ -336,7 +349,10 @@ static void * producer_loop(__rte_unused void * arg)
 	struct rte_mbuf * burst [PKT_BURST_SZ];
 	struct timeval t_last, t_pkt;
 	int port, i, nb_rx, nb_enq, nb_empty_ifaces;
+	unsigned int ring_free;
+	uint64_t nb_bytes, ring_count;
 	long diff_usec;
+	struct instance_counters * c = &counters[instance];
     static uint64_t start_time, end_time, elapsed;
 
 	gettimeofday(&t_last, NULL);
@@ -349,10 +365,12 @@ static void * producer_loop(__rte_unused void * arg)
 		for (port = 0; port < nb_ports; port++){
 
 			nb_rx = rte_eth_rx_burst(port, instance, burst, PKT_BURST_SZ);
+			/* The queue is now empty, including when no packet was read */
+			if (nb_rx < PKT_BURST_SZ)
+				nb_empty_ifaces++;
 			if (nb_rx == 0)
 				continue;
-            if (nb_rx<PKT_BURST_SZ)
-                nb_empty_ifaces++;
+			nb_bytes = 0;
 
 			/* The packets of the burst are timestamped evenly between the previous burst and now */
 			t_pkt = t_last;
@@ -369,14 +387,22 @@ static void * producer_loop(__rte_unused void * arg)
 					t_pkt.tv_usec %= 1000000;
 				}
 				SET_TIMESTAMP(burst[i], t_pkt);
+				nb_bytes += rte_pktmbuf_pkt_len(burst[i]);
 			}
-			nb_packets += nb_rx;
 
 			/* If the ring is full, drop the packets */
-			nb_enq = rte_ring_enqueue_burst(ring, (void **)burst, nb_rx, NULL);
+			nb_enq = rte_ring_enqueue_burst(ring, (void **)burst, nb_rx, &ring_free);
 			for (i = nb_enq; i < nb_rx; i++)
 				rte_pktmbuf_free(burst[i]);
-			nb_drop += nb_rx - nb_enq;
+
+			/* Only this thread writes the counters, but the parent reads them */
+			__atomic_store_n(&c->rx_pkts, c->rx_pkts + nb_rx, __ATOMIC_RELAXED);
+			__atomic_store_n(&c->rx_bytes, c->rx_bytes + nb_bytes, __ATOMIC_RELAXED);
+			if (nb_enq < nb_rx)
+				__atomic_store_n(&c->drops, c->drops + nb_rx - nb_enq, __ATOMIC_RELAXED);
+			ring_count = rte_ring_get_capacity(ring) - ring_free;
+			if (ring_count > __atomic_load_n(&c->ring_max, __ATOMIC_RELAXED))
+				__atomic_store_n(&c->ring_max, ring_count, __ATOMIC_RELAXED);
 		}
 
         /* If all queues have are now empty, sleep for remaining time */
@@ -402,16 +428,18 @@ static void consumer_loop(void)
 	struct rte_mbuf * m;
 	uint64_t now, last_check;
 
-	stats_init();
+	if (instance == 0)
+		display_init();
 	last_check = rte_get_tsc_cycles();
 
 	while (!stop){
 
-		/* Every second, the parent checks that the children are running */
+		/* Every second, the parent checks that the children are running and prints the stats */
 		if (instance == 0){
 			now = rte_get_tsc_cycles();
 			if (now - last_check > rte_get_tsc_hz()){
 				check_children();
+				display_update();
 				last_check = now;
 			}
 		}
@@ -449,7 +477,6 @@ static void process_packet(struct rte_mbuf * m)
 	GET_TIMESTAMP(m, tv);
 	tstat_next_pckt(&tv, data + ip_offset, data + len - 1, len - ip_offset, 0);
 	nb_tstat_packets++;
-	stats_update();
 }
 
 
@@ -473,6 +500,7 @@ static void print_final_stats(void)
 	int i, j;
 	char buffer [100];
 	time_t now;
+	uint64_t nb_drop;
 	struct rte_eth_stats stat;
 	tstat_report report;
 
@@ -497,6 +525,7 @@ static void print_final_stats(void)
 
 	/* Every instance prints its stats and the Tstat ones */
 	tstat_close(&report);
+	nb_drop = counters[instance].drops;
 	printf("\nINSTANCE: %d Rx: %lu Drp: %lu Tot: %lu Perc: %.3f%%\n", instance, nb_tstat_packets, nb_drop,
 	       nb_tstat_packets + nb_drop, (float)nb_drop / (nb_tstat_packets + nb_drop) * 100);
 	printf("TSTAT STATISTICS:\n");
@@ -505,76 +534,166 @@ static void print_final_stats(void)
 }
 
 
-/* Every second, print the stats of the instance; the parent also prints the stats of the ports */
+/* Every second, the parent prints the stats of the ports and of the instances */
 static struct {
-	uint64_t hz;			/* TSC cycles per second */
-	uint64_t last_time;
+	int tty;			/* Standard output is a terminal: redraw the screen */
+	time_t start;
+	uint64_t last_time;		/* TSC cycles */
 	/* Counters at the end of the previous interval */
-	uint64_t nb_packets;
-	uint64_t nb_drop;
 	struct rte_eth_stats ports [MAX_PORTS];
-} stats;
+	struct instance_counters instances [MAX_INSTANCES];
+	/* Text of the screen */
+	char buf [16384];
+	size_t len;
+} display;
 
-static void stats_init(void)
+/* Append to the screen text; on a terminal, also clear the rest of each line */
+static void screen_printf(const char * fmt, ...)
 {
-	stats.hz = rte_get_tsc_hz();
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(display.buf + display.len, sizeof(display.buf) - display.len, fmt, ap);
+	va_end(ap);
+	if (ret > 0)
+		display.len = RTE_MIN(display.len + ret, sizeof(display.buf) - 1);
 }
 
-static void print_ports_stats(uint64_t now, uint64_t nb_drop_interval)
+static void screen_newline(void)
+{
+	screen_printf(display.tty ? "\033[K\n" : "\n");
+}
+
+/* Format an integer with a space as thousands separator, e.g., "1 482" */
+static const char * fmt_count(char * buf, size_t size, uint64_t value)
+{
+	char digits [32];
+	int nb_digits, i, j;
+
+	nb_digits = snprintf(digits, sizeof(digits), "%" PRIu64, value);
+	for (i = 0, j = 0; i < nb_digits && j < (int)size - 2; i++){
+		if (i > 0 && (nb_digits - i) % 3 == 0)
+			buf[j++] = ' ';
+		buf[j++] = digits[i];
+	}
+	buf[j] = '\0';
+	return buf;
+}
+
+static double percent(uint64_t part, uint64_t total)
+{
+	return total > 0 ? (double)part / total * 100 : 0;
+}
+
+static void display_init(void)
 {
 	int i;
-	char buffer [100];
-	time_t t;
-	struct rte_eth_stats stat;
 
-	t = time(NULL);
-	strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", localtime(&t));
-	printf("\n");
+	display.tty = isatty(STDOUT_FILENO);
+	display.start = time(NULL);
+	display.last_time = rte_get_tsc_cycles();
+	for (i = 0; i < nb_ports; i++)
+		rte_eth_stats_get(i, &display.ports[i]);
+}
+
+static void display_print_ports(double interval)
+{
+	int i;
+	char buf1 [32], buf2 [32];
+	struct rte_eth_stats stat;
+	uint64_t packets, bytes, missed, errors;
+	uint64_t tot_packets = 0, tot_bytes = 0, tot_missed = 0, tot_errors = 0;
+
+	screen_printf("PORT        Mbps      kpps      missed      errors    drop%%");
+	screen_newline();
 	for (i = 0; i < nb_ports; i++){
 		rte_eth_stats_get(i, &stat);
-		uint64_t packets = stat.ipackets - stats.ports[i].ipackets;
-		uint64_t missed = stat.imissed - stats.ports[i].imissed;
-		uint64_t errors = stat.ierrors - stats.ports[i].ierrors;
-		uint64_t tot = packets + missed + errors;
-		uint64_t bytes = stat.ibytes - stats.ports[i].ibytes;
-		double interval = (double)(now - stats.last_time) / stats.hz;
+		packets = stat.ipackets - display.ports[i].ipackets;
+		bytes = stat.ibytes - display.ports[i].ibytes;
+		/* Missed includes the packets dropped because the mempool is full */
+		missed = stat.imissed - display.ports[i].imissed + stat.rx_nombuf - display.ports[i].rx_nombuf;
+		errors = stat.ierrors - display.ports[i].ierrors;
+		display.ports[i] = stat;
 
-		printf("TIME: %s - PORT: %2d Rate: %8.3f Mbps %0.3f Mpps Rx: %8lu Missed: %8lu Err: %8lu Tot: %8lu Perc Drop: %6.3f%%",
-		       buffer, i, bytes * 8 / interval / 1000000, packets / interval / 1000000, packets, missed, errors, tot,
-		       (double)(errors + missed) / tot * 100);
-		if (missed + errors > 0 || nb_drop_interval > 0)
-			printf(" <--------L-O-S-I-N-G---------");
-		printf("\n");
-		stats.ports[i] = stat;
+		screen_printf("%4d  %10.1f  %8.1f  %10s  %10s  %7.3f", i, bytes * 8 / interval / 1e6, packets / interval / 1e3,
+		              fmt_count(buf1, sizeof(buf1), missed), fmt_count(buf2, sizeof(buf2), errors),
+		              percent(missed + errors, packets + missed + errors));
+		screen_newline();
+		tot_packets += packets;
+		tot_bytes += bytes;
+		tot_missed += missed;
+		tot_errors += errors;
+	}
+	screen_printf(" all  %10.1f  %8.1f  %10s  %10s  %7.3f", tot_bytes * 8 / interval / 1e6, tot_packets / interval / 1e3,
+	              fmt_count(buf1, sizeof(buf1), tot_missed), fmt_count(buf2, sizeof(buf2), tot_errors),
+	              percent(tot_missed + tot_errors, tot_packets + tot_missed + tot_errors));
+	screen_newline();
+}
+
+static void display_print_instances(double interval)
+{
+	int i;
+	char buf [32];
+	uint64_t ring_max [MAX_INSTANCES];
+	struct instance_counters now [MAX_INSTANCES], delta [MAX_INSTANCES];
+	uint64_t tot_packets = 0;
+
+	/* Take a snapshot of the counters of all the instances */
+	for (i = 0; i < nb_instances; i++){
+		now[i].rx_pkts = __atomic_load_n(&counters[i].rx_pkts, __ATOMIC_RELAXED);
+		now[i].rx_bytes = __atomic_load_n(&counters[i].rx_bytes, __ATOMIC_RELAXED);
+		now[i].drops = __atomic_load_n(&counters[i].drops, __ATOMIC_RELAXED);
+		ring_max[i] = __atomic_exchange_n(&counters[i].ring_max, 0, __ATOMIC_RELAXED);
+		delta[i].rx_pkts = now[i].rx_pkts - display.instances[i].rx_pkts;
+		delta[i].rx_bytes = now[i].rx_bytes - display.instances[i].rx_bytes;
+		delta[i].drops = now[i].drops - display.instances[i].drops;
+		display.instances[i] = now[i];
+		tot_packets += delta[i].rx_pkts;
+	}
+
+	screen_printf("INST        Mbps      kpps   share%%   ring%%     drops    drop%%");
+	screen_newline();
+	for (i = 0; i < nb_instances; i++){
+		screen_printf("%4d  %10.1f  %8.1f   %6.1f  %6.2f  %8s  %7.3f", i,
+		              delta[i].rx_bytes * 8 / interval / 1e6, delta[i].rx_pkts / interval / 1e3,
+		              percent(delta[i].rx_pkts, tot_packets), percent(ring_max[i], rte_ring_get_capacity(rings[i])),
+		              fmt_count(buf, sizeof(buf), delta[i].drops), percent(delta[i].drops, delta[i].rx_pkts));
+		screen_newline();
 	}
 }
 
-static void stats_update(void)
+/* Print the stats of the last interval: on a terminal, redraw the screen from the top */
+static void display_update(void)
 {
-	uint64_t now, local_nb_packets, local_nb_drop;
+	char date [32];
+	time_t now, uptime;
+	uint64_t tsc;
+	double interval;
 
-	/* The first interval starts with the first packet */
-	if (unlikely(stats.last_time == 0))
-		stats.last_time = rte_get_tsc_cycles();
+	tsc = rte_get_tsc_cycles();
+	interval = (double)(tsc - display.last_time) / rte_get_tsc_hz();
+	display.last_time = tsc;
 
-	now = rte_get_tsc_cycles();
-	if (now - stats.last_time <= stats.hz)
-		return;
+	now = time(NULL);
+	uptime = now - display.start;
+	strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
-	/* Copy the counters of the producer */
-	local_nb_packets = nb_packets;
-	local_nb_drop = nb_drop;
+	display.len = 0;
+	if (display.tty)
+		screen_printf("\033[H");
+	screen_printf("═══ Tstat-DPDK ═══ %s ═══ uptime %ldd %02ld:%02ld:%02ld ═══════════", date,
+	              (long)uptime / 86400, (long)uptime / 3600 % 24, (long)uptime / 60 % 60, (long)uptime % 60);
+	screen_newline();
+	screen_newline();
+	display_print_ports(interval);
+	screen_newline();
+	display_print_instances(interval);
+	screen_printf(display.tty ? "\033[J" : "\n");
 
-	if (instance == 0)
-		print_ports_stats(now, local_nb_drop - stats.nb_drop);
-
-	printf("    INSTANCE: %2d Processed: %8lu Drop: %8lu Tot: %8lu Buffer Occupancy: %6.3f%%\n",
-	       instance, local_nb_packets - stats.nb_packets - (local_nb_drop - stats.nb_drop),
-	       local_nb_drop - stats.nb_drop, local_nb_packets - stats.nb_packets,
-	       100.0 - (float)rte_ring_free_count(ring) / INTERMEDIATERING_SZ * 100.0);
-
-	/* Start a new interval */
-	stats.last_time = now;
-	stats.nb_packets = local_nb_packets;
-	stats.nb_drop = local_nb_drop;
+	/* Write the whole screen at once */
+	fflush(stdout);
+	if (write(STDOUT_FILENO, display.buf, display.len) < 0){
+		/* Ignore the errors: the analysis goes on even if the terminal is closed */
+	}
 }

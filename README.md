@@ -261,14 +261,32 @@ The `-c` and `-n` options before `--` are DPDK-related. **Do not change them.** 
     `RTE_ETH_VLAN_STRIP_OFFLOAD`, `RTE_ETH_QINQ_STRIP_OFFLOAD`. 
 
 
-Approximatively every second, Tstat-DPDK prints statistics: the rate, received, missed and erroneous packets of each port, and the packets processed and dropped by each instance, with the utilization of the buffer between its producer and consumer.
+Every second, Tstat-DPDK prints statistics about the last second. If the output is a terminal, the screen is redrawn from the top at each update; otherwise (e.g., when redirected to a file), the statistics are appended.
+```
+═══ Tstat-DPDK ═══ 2026-10-30 20:18:29 ═══ uptime 0d 02:14:07 ═══════════
 
-Below you have an example of this output
+PORT        Mbps      kpps      missed      errors    drop%
+   0       959.0     120.2           0           0    0.000
+   1       614.8      62.8           0           0    0.000
+ all      1573.8     183.0           0           0    0.000
+
+INST        Mbps      kpps   share%   ring%     drops    drop%
+   0       536.9      62.1    34.1    0.09      1 482    2.387
+   1       517.6      58.6    32.9    0.05          0    0.000
+   2       327.3      37.1    20.8    0.00          0    0.000
+   3       190.9      21.6    12.1    0.00          0    0.000
 ```
-TIME: 2025-03-21 16:25:01 - PORT:  0 Rate: 2410.312 Mbps 0.412 Mpps Rx:   412310 Missed:        0 Err:        0 Tot:   412310 Perc Drop:  0.000%
-    INSTANCE:  0 Processed:   206512 Drop:        0 Tot:   206512 Buffer Occupancy:  0.000%
-    INSTANCE:  1 Processed:   205798 Drop:        0 Tot:   205798 Buffer Occupancy:  0.000%
-```
+For each port (and for all of them):
+* `Mbps` and `kpps`: rate of the packets received by the NIC.
+* `missed`: packets dropped by the NIC, because its rx queues are full or because no buffer is available in the mempool.
+* `errors`: erroneous packets.
+* `drop%`: percentage of missed and erroneous packets.
+
+For each instance:
+* `Mbps` and `kpps`: rate of the packets read by the producer from the NICs.
+* `share%`: percentage of the packets of all the instances analyzed by this instance, which shows how RSS balances the traffic.
+* `ring%`: maximum occupancy, in the last second, of the ring between the producer and the consumer. A high value means that the consumer cannot keep up with the traffic.
+* `drops` and `drop%`: packets dropped by the producer, because the ring is full.
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 

@@ -539,6 +539,8 @@ static struct {
 	int tty;			/* Standard output is a terminal: redraw the screen */
 	time_t start;
 	uint64_t last_time;		/* TSC cycles */
+	uint64_t lost;			/* Packets lost since the start */
+	time_t last_loss;		/* Time of the last loss, 0 if none */
 	/* Counters at the end of the previous interval */
 	struct rte_eth_stats ports [MAX_PORTS];
 	struct instance_counters instances [MAX_INSTANCES];
@@ -698,14 +700,13 @@ static void display_print_instances(const struct instance_counters * instances, 
 static void display_update(void)
 {
 	int i;
-	char date [32], buf [32];
+	char date [32], last_loss [32], buf [32];
 	time_t now, uptime;
 	uint64_t tsc, lost, offered;
 	double interval;
 	struct rte_eth_stats ports [MAX_PORTS];
 	struct instance_counters instances [MAX_INSTANCES];
 	uint64_t ring_max [MAX_INSTANCES];
-	enum row_level level;
 
 	tsc = rte_get_tsc_cycles();
 	interval = (double)(tsc - display.last_time) / rte_get_tsc_hz();
@@ -733,6 +734,14 @@ static void display_update(void)
 	now = time(NULL);
 	uptime = now - display.start;
 	strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", localtime(&now));
+	if (lost > display.lost){
+		display.lost = lost;
+		display.last_loss = now;
+	}
+	if (display.last_loss > 0)
+		strftime(last_loss, sizeof(last_loss), "%Y-%m-%d %H:%M:%S", localtime(&display.last_loss));
+	else
+		snprintf(last_loss, sizeof(last_loss), "never");
 
 	display.len = 0;
 	if (display.tty)
@@ -740,10 +749,9 @@ static void display_update(void)
 	screen_printf("═══ Tstat-DPDK ═══ %s ═══ uptime %ldd %02ld:%02ld:%02ld ═══════════", date,
 	              (long)uptime / 86400, (long)uptime / 3600 % 24, (long)uptime / 60 % 60, (long)uptime % 60);
 	screen_newline();
-	level = lost > 0 ? ROW_LOSS : ROW_OK;
-	row_begin(level);
-	screen_printf("Lost since start: %s packets (%.3f%%)", fmt_count(buf, sizeof(buf), lost), percent(lost, offered));
-	row_end(level);
+	screen_printf("Lost since start: %s packets (%.3f%%), last loss: %s", fmt_count(buf, sizeof(buf), lost),
+	              percent(lost, offered), last_loss);
+	screen_newline();
 	screen_newline();
 	display_print_ports(ports, interval);
 	screen_newline();

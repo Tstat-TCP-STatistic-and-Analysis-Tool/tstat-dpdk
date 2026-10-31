@@ -264,7 +264,7 @@ The `-c` and `-n` options before `--` are DPDK-related. **Do not change them.** 
 Every second, Tstat-DPDK prints statistics about the last second. If the output is a terminal, the screen is redrawn from the top at each update; otherwise (e.g., when redirected to a file), the statistics are appended.
 ```
 ═══ Tstat-DPDK ═══ 2026-10-30 20:18:29 ═══ uptime 0d 02:14:07 ═══════════
-Lost since start: 3 105 packets (0.001%)  LOSS
+Lost since start: 3 105 packets (0.001%), last loss: 2026-10-30 20:18:29
 
 PORT        Mbps      kpps      missed      errors    drop%
    0       959.0     120.2           0           0    0.000
@@ -289,8 +289,8 @@ For each instance:
 * `ring%`: maximum occupancy, in the last second, of the ring between the producer and the consumer. A high value means that the consumer cannot keep up with the traffic.
 * `drops` and `drop%`: packets dropped by the producer, because the ring is full.
 
-The first line reports the packets lost since the start, by the NICs (missed and erroneous) and by the instances (dropped), and their percentage over the packets that reached the NICs.
-The rows with losses in the last second end with `LOSS`, and the instances whose ring was more than 50% full (`RING_WARN_PERC` in `src/tstat-dpdk-params.h`) end with `RING>50%`, as they are about to lose packets. On a terminal, these rows are also colored in red and yellow, respectively, as is the first line if any packet has been lost.
+The line under the title reports the packets lost since the start, by the NICs (missed and erroneous) and by the instances (dropped), their percentage over the packets that reached the NICs, and the time of the last loss (`never` if no packet has been lost).
+The rows with losses in the last second end with `LOSS`, and the instances whose ring was more than 50% full (`RING_WARN_PERC` in `src/tstat-dpdk-params.h`) end with `RING>50%`, as they are about to lose packets. On a terminal, these rows are also colored in red and yellow, respectively.
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 

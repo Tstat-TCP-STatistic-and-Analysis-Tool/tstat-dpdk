@@ -3,18 +3,18 @@ Tstat-DPDK Quick Start Guide
 
 * [1. Introduction](#intro)
 * [2. Installation](#inst)
-    * [2.1 Installing Intel DPDK](#inst-dpdk)
+    * [2.1 Installing DPDK](#inst-dpdk)
     * [2.2 Installing Tstat DPDK](#inst-tstat-dpdk)
         * [2.2.1 Installing Libtstat](#comp-libtstat)
         * [2.2.2 Installing the DPDK Load Balancer](#comp-dpdk-cluster)
-* [3. System Comfiguration](#conf)
-    * [3.1 Reserve a large number of hugepages to DPDK](#conf-hugepage)
+* [3. System Configuration](#conf)
+    * [3.1 Reserve hugepages to DPDK](#conf-hugepage)
     * [3.2 Force CPUs clock to remain high](#conf-cpu)
-    * [3.3 Disable Address Layout Space Randomization](#alsr)
-    * [3.4 Bind NICs to DPDK driver](#conf-nics)
-    * [3.5 Set up Tstat configurations](#conf-libtstat)    
+    * [3.3 Bind NICs to DPDK driver](#conf-nics)
+    * [3.4 Set up Tstat configurations](#conf-libtstat)
 * [4. Run Tstat-DPDK](#run)
     * [4.1 Start Tstat Instances](#start)
+        * [4.1.1 Filtering the output saved by screen](#screenlog)
     * [4.2 Stop Tstat Instances](#stop)
     * [4.3 Log Files Directory](#logs)
     * [4.4 Merging the logs of the instances](#merge)
@@ -23,7 +23,7 @@ Tstat-DPDK Quick Start Guide
 
 # 1. <a name="intro"></a> Introduction
 
-This document is a quick start guide for Tstat-DPDK, a Tstat version supporting Intel Data Plane Development Kit ([DPDK](http://dpdk.org/)) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
+This document is a quick start guide for Tstat-DPDK, a Tstat version supporting the Data Plane Development Kit ([DPDK](https://www.dpdk.org/)) network packet acquisition framework. Differently from the standard Tstat version, Tstat-DPDK supports multicore processing resulting in significant performance enhancements.
 
 Tstat-DPDK consists of in a DPDK wrapper for Tstat
 
@@ -34,38 +34,35 @@ Tstat-DPDK consists of in a DPDK wrapper for Tstat
 Essentially, the DPDK wrapper acts as **load balancer**, reading the aggregate traffic and dispatching packets to different **Tstat instances**, i.e., different Tstat processes. By associating different processes to different cores the overall system can sustain multiple 10Gbps of input aggregate traffic.
 
 Here below we provide a step by step guide to setup the overall system.
-This guide is not meant to be a fine grained tutorial about Intel DPDK not Tstat functioning. For more details, we refer the reader to
+This guide is not meant to be a fine grained tutorial about DPDK nor Tstat functioning. For more details, we refer the reader to
 
 * the [Tstat wiki](https://github.com/Tstat-TCP-STatistic-and-Analysis-Tool/tstat/wiki)
-* official Intel [DPDK website](http://dpdk.org/doc) and [quick start](http://dpdk.org/doc/quick-start)
+* the [DPDK documentation](https://doc.dpdk.org/guides-23.11/) and its [Getting Started Guide for Linux](https://doc.dpdk.org/guides-23.11/linux_gsg/index.html)
 * For information about this Readme file and Tstat-DPDK please write to [martino.trevisan@dia.units.it](mailto:martino.trevisan@dia.units.it)
 
 # 2. <a name="inst"></a>Installation
 
 A few general dependencies are required before starting
 
-* Intel DPDK requires  **Intel 82599 based network interfaces**
-* A Linux distribution with kernel >= 3.14 (we tested it on Ubuntu)
-* Linux kernel headers: to install run
-```bash
-    sudo apt-get install linux-headers-$(uname -r)
-```
-
+* A 64-bit Linux distribution: we test it on Ubuntu
+* Network interfaces supported by a DPDK poll mode driver (see the [list of supported NICs](https://doc.dpdk.org/guides-23.11/nics/index.html)) with **RSS**, used to split the traffic among the Tstat instances, e.g., Intel 82599, X540, X710 or E810
 * Several packages needed before installing this software:
 
-  * DPDK needs: `make, cmp, sed, grep, arch, glibc.i686, libgcc.i686, libstdc++.i686, glibc-devel.i686, python`
+  * DPDK needs: `build-essential, meson, ninja-build, python3-pyelftools, libnuma-dev, pkg-config`
   * Tstat needs: `build-essential, libpcap-dev, libldns-dev, libssl-dev, librrd-dev`
-  * The system configuration and the tools need: `cpufrequtils, libxml2-dev` (for `rrd_merger`), `bc` and `wireshark-common` (`mergecap`, for the log mergers)
+  * The system configuration and the tools need: `linux-tools-common` and `linux-tools-$(uname -r)` (`cpupower`), `screen`, `libxml2-dev` (for `rrd_merger`), `bc` and `wireshark-common` (`mergecap`, for the log mergers)
 
-  On Ubuntu, the Tstat dependencies can be installed with:
+  On Ubuntu, they can be installed with:
 ```bash
-    sudo apt-get install build-essential libpcap-dev libldns-dev libssl-dev librrd-dev
+    sudo apt-get install build-essential meson ninja-build python3-pyelftools libnuma-dev pkg-config
+    sudo apt-get install libpcap-dev libldns-dev libssl-dev librrd-dev
+    sudo apt-get install linux-tools-common linux-tools-$(uname -r) screen libxml2-dev bc wireshark-common
 ```
 
 
-## 2.1 <a name="inst-dpdk"></a>Installing Intel DPDK
+## 2.1 <a name="inst-dpdk"></a>Installing DPDK
 
-We highly recommend to use **Install DPDK v23.11.1**. With other versions it is **NOT** guaranted to work properly.
+We highly recommend to install **DPDK v23.11.1** (LTS). With other versions it is **NOT** guaranteed to work properly.
 
 ```bash
 DPDK_VERS="23.11.1"
@@ -86,11 +83,13 @@ popd
 popd
 ```
 
-**NOTES:** 
-
-* `RTE_SDK` and `RTE_TARGET` are two environment variables used by DPDK to handle DPDK applications. These variables have to point respectively to DPDK installation directory and compilation target.
-* if you are running on a i686 machine, please use `i686-native-linuxapp-gcc` as `RTE_TARGET`
-* For more information we refer the reader to the [official documentation](http://dpdk.org/doc/)
+DPDK is installed under `/usr/local`: the libraries in `/usr/local/lib/x86_64-linux-gnu`, the tools (e.g., `dpdk-devbind.py` and `dpdk-hugepages.py`) in `/usr/local/bin`.
+The Tstat-DPDK Makefile finds DPDK with `pkg-config`: check that the installation is visible with
+```bash
+    pkg-config --modversion libdpdk
+```
+which must print `23.11.1`. If it does not find `libdpdk`, add the directory of `libdpdk.pc` to `PKG_CONFIG_PATH`, e.g., `export PKG_CONFIG_PATH=/usr/local/lib/x86_64-linux-gnu/pkgconfig`.
+For more information we refer the reader to the [DPDK documentation](https://doc.dpdk.org/guides-23.11/linux_gsg/build_dpdk.html).
 
 
 
@@ -147,72 +146,71 @@ For more details, see the [Installation](https://github.com/Tstat-TCP-STatistic-
 
 Before running Tstat-DPDK there are few things to do.
 
-**Note:** To simplity the setup, all the steps can be automatically performed using the script `$TSTATDPDK/tstat-dpdk/scripts/configure_machine.sh`.
-Please verify that the script is doing the right operation for your system.
+**Note:** To simplify the setup, the steps 3.1, 3.2 and 3.3 can be performed with the script `$TSTATDPDK/tstat-dpdk/scripts/configure_machine.sh`, which must be run after each reboot.
+Please edit its parameters (number of hugepages and PCI addresses of the NICs) and verify that it is doing the right operations for your system.
 
-## 3.1 <a name="conf-hugepage"></a>Reserve a large number of hugepages to DPDK
+## 3.1 <a name="conf-hugepage"></a>Reserve hugepages to DPDK
 
-To improve memory handling, it is highly recommended to increase the number of `hugepages` used by the linux kernel. A typical set up would suggest to use `512 * N` where `N` is the number of cores (considered as sum of physical and virtual). The size of each huge page is 2MB.
-
-For instance, for a 8 core system this would result in `4096 hugepages`, i.e., 8GB of memory. In scenarios not suffering of strong memory constraints, we recommend to use `6144 hugepages`, i.e., 12GB of memory
+DPDK allocates its memory from hugepages. Each Tstat instance needs about 2 GB of them, as it has a pool of 512k packet buffers of 4 KB (`MEMPOOL_ELEM_NB` and `MEMPOOL_ELEM_SZ` in `src/tstat-dpdk-params.h`): reserve about **1100 hugepages of 2 MB for each instance**, plus some margin.
+For instance, `6144` hugepages (12 GB) are enough for up to 5 instances.
 
 ```bash
-	sudo bash -c "echo 6144 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
-	sudo mkdir -p /mnt/huge
-	sudo mount -t hugetlbfs nodev /mnt/huge
+	sudo dpdk-hugepages.py --pagesize 2M --setup 12G
+	dpdk-hugepages.py --show
 ```
+`--setup` reserves the hugepages and mounts them in `/dev/hugepages`. Equivalently, without the DPDK tool:
+```bash
+	sudo bash -c "echo 6144 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
+```
+(on Ubuntu, `/dev/hugepages` is mounted at boot).
+On NUMA machines, the memory of each instance is allocated on the NUMA node of its cores, so each node needs enough hugepages for the instances running on it. `dpdk-hugepages.py` reserves the given amount on each node (or only on the one chosen with `--node`), while writing in `nr_hugepages` splits the pages among the nodes.
 
 ## 3.2 <a name="conf-cpu"></a>Force CPUs clock to remain high
 
-To achieve the best performance, your CPU must always run at the highest speed. You need to have installed `cpufrequtils` package.
+To achieve the best performance, your CPU must always run at the highest speed. You need to have installed the `linux-tools` packages (see [Installation](#inst)).
 
 ```bash
-	sudo cpufreq-set -r -g performance
+	sudo cpupower frequency-set -g performance
 ```
 
-## 3.3 <a name="alsr"></a>Disable Address Layout Space Randomization
-Address Layout Space Randomization (ALSR) is a feature of Linux systems, that unfortunately sometimes makes DPDK application not to start properly (more info [here](http://dpdk.org/doc/guides-1.8/prog_guide/multi_proc_support.html#multi-process-limitations)).
-So we suggest to disable it by means of this command:
-```bash
-	sudo bash -c "echo 0 > /proc/sys/kernel/randomize_va_space"
-```
+## 3.3 <a name="conf-nics"></a>Bind NICs to DPDK driver
 
-## 3.4 <a name="conf-nics"></a> Bind NICs to DPDK driver
+In order to use DPDK on a NIC, the NIC must be detached from its kernel driver and bound to a driver usable by DPDK, typically `vfio-pci`.
+`vfio-pci` needs the IOMMU: enable it adding `intel_iommu=on iommu=pt` (Intel CPUs) or `iommu=pt` (AMD CPUs) to the kernel command line, i.e., to `GRUB_CMDLINE_LINUX_DEFAULT` in `/etc/default/grub`, then run `sudo update-grub` and reboot.
+For more details, see the [DPDK documentation](https://doc.dpdk.org/guides-23.11/linux_gsg/linux_drivers.html).
 
-In order to use the DPDK framework on a NIC we need to change the driver associated to the network card. The driver is located within the `kmod` folder of the DPDK version compiled (recall the configuration of the `RTE_SDK` and `RTE_TARGET` used at compile time).
-
-The following command enable DPDK drivers for all DPDK-supported NICs
+Find the PCI addresses of the NICs with `dpdk-devbind.py --status`, then bind them:
 
 ```bash
-	IFACES=("0000:85:00.0" ... )
-	
-	#Loading modules
-	sudo modprobe uio
+	IFACES=("0000:04:00.0" "0000:04:00.1")
+
 	sudo modprobe vfio-pci
-	
-	#Binding interfaces to DPDK drivers
 	for IFACE in "${IFACES[@]}" ; do
-	    sudo $RTE_SDK/usertools/dpdk-devbind.py --bind=vfio-pci $IFACE
+	    sudo dpdk-devbind.py --bind=vfio-pci $IFACE
 	done
 ```
+The interfaces must be down (e.g., `sudo ip link set <iface> down`), otherwise `dpdk-devbind.py` refuses to bind them.
 
-To check if your network interfaces have been properly set by the Intel DPDK enviroment run:
+To check if your network interfaces have been properly bound, run:
 ```bash
-	sudo $RTE_SDK/usertools/dpdk-devbind.py --status
+	dpdk-devbind.py --status
 ```
-You should get an output like this, which means that the first two interfaces are running under DPDK driver, while the third is not:
+You should get an output like this, which means that the first two interfaces are using a DPDK-compatible driver, while the third is not:
 ```
 Network devices using DPDK-compatible driver
 ============================================
-0000:04:00.0 'Ethernet Controller 10-Gigabit X540-AT2' drv=igb_uio unused=
-0000:04:00.1 'Ethernet Controller 10-Gigabit X540-AT2' drv=igb_uio unused=
+0000:04:00.0 'Ethernet Controller 10-Gigabit X540-AT2 1528' drv=vfio-pci unused=ixgbe
+0000:04:00.1 'Ethernet Controller 10-Gigabit X540-AT2 1528' drv=vfio-pci unused=ixgbe
+
 Network devices using kernel driver
 ===================================
-0000:03:00.0 'NetXtreme BCM5719 Gigabit Ethernet PCIe' if=eth0 drv=tg3 unused=igb_uio *Active*
+0000:03:00.0 'NetXtreme BCM5719 Gigabit Ethernet PCIe 1657' if=eno1 drv=tg3 unused=vfio-pci *Active*
 ```
-**NOTE:** If for any reason you don't want to bind all the DPDK-supported interfaces to DPDK enviroment, use the `dpdk_nic_bind.py` as described in the [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
+Tstat-DPDK uses all the NICs bound to DPDK. To use only some of them, pass their PCI addresses with the `-a` EAL option (see [Start Tstat instances](#start)).
 
-## 3.5  <a name="conf-libtstat"></a>Set up Tstat configuration
+**Note:** NVIDIA/Mellanox NICs (`mlx5` driver) must not be bound to `vfio-pci`: DPDK uses them while they remain bound to their kernel driver.
+
+## 3.4 <a name="conf-libtstat"></a>Set up Tstat configuration
 
 Since multiple Tstat processes will be executed separately, the system will produce separate statistics for each instance. As such, we need to configure each instance separately.
 
@@ -241,11 +239,15 @@ Avoid running other CPU intensive processes on these cores.
 
 If you want to start 2 instances, type:
 ```bash
-	sudo $TSTATDPDK/tstat-dpdk/build/tstat_dpdk -c 1 -n 4 -- -m 2
+	sudo $TSTATDPDK/tstat-dpdk/build/tstat_dpdk -l 0 -n 4 -- -m 2
 ```
 This executes Tstat-DPDK splitting the traffic among 2 separate Tstat processes.
 
-It might be useful to run this command detached from the shell (ending it with `&`).
+As Tstat-DPDK redraws its statistics on the terminal every second, we suggest to run it inside `screen`, so that it keeps running when you disconnect, and to save its output with the `-L` option (in the file `screenlog.0` of the current directory):
+```bash
+	screen -L -S tstat sudo $TSTATDPDK/tstat-dpdk/build/tstat_dpdk -l 0 -n 4 -- -m 2
+```
+Detach with `CTRL+A D` and reattach with `screen -r tstat`.
 
 **Command line options**
 
@@ -253,7 +255,7 @@ It might be useful to run this command detached from the shell (ending it with `
 
 `-c <format>` sets the **Tstat configuration file** of each instance. The argument is a `printf`-like format, where `%d` (or, e.g., `%02d`) is replaced by the number of the instance; it must contain exactly one such conversion (use `%%` for a literal `%`). The default is `tstat-conf/tstat%02d.conf`, i.e., `tstat-conf/tstat00.conf`, `tstat-conf/tstat01.conf`, etc., relative to the current directory. For example, `-c /etc/tstat/instance%d.conf` uses `/etc/tstat/instance0.conf`, `/etc/tstat/instance1.conf`, etc.
 
-The `-c` and `-n` options before `--` are DPDK-related. **Do not change them.** They are related to CPU cores and memory channels to use. For more info refer to [DPDK getting started guide](http://dpdk.org/doc/intel/dpdk-start-linux-1.7.0.pdf).
+The options before `--` are DPDK-related (EAL options): `-l 0` runs the main thread of DPDK on core 0 (Tstat-DPDK then moves its threads to their own cores, see above) and `-n 4` sets the number of memory channels. `-a <PCI address>`, repeated, uses only the given NICs. Do not confuse the `-c` EAL option (core mask) with the `-c` option of Tstat-DPDK, after `--`. For more info refer to the [EAL parameters](https://doc.dpdk.org/guides-23.11/linux_gsg/linux_eal_parameters.html).
 
 `-e` option set **extra header bytes** to skip in order to arrive to the IP header. Example: set to 4 in case of a vlan tag. 
 
@@ -293,32 +295,44 @@ The line under the title reports the packets lost since the start, by the NICs (
 The rows with losses in the last second end with `LOSS`, and the instances whose ring was more than 50% full (`RING_WARN_PERC` in `src/tstat-dpdk-params.h`) end with `RING>50%`, as they are about to lose packets. On a terminal, these rows are also colored in red and yellow, respectively.
 As the probes always lose some packets when starting, the losses until the first update (after one second) are not counted, neither in the rows nor in the total.
 
+### 4.1.1 <a name="screenlog"></a>Filtering the output saved by screen
+
+The output saved by `screen -L` in `screenlog.0` contains all the statistics printed every second, with the terminal control codes.
+To find when packets have been lost, print the rows with `LOSS` and the 4 lines before and after them, removing the control codes:
+```bash
+	cat screenlog.0 | grep -B4 -A4 LOSS | sed 's/\x1b\[[0-9;]*[A-Za-z]//g'
+```
+To remove all the periodic statistics, leaving only the messages of Tstat and DPDK, remove the lines containing non-printable characters (the statistics contain control codes and the `═` characters):
+```bash
+	cat screenlog.0 | grep -Pv '[^\x09\x0d\x20-\x7e]'
+```
+This also removes the few messages of Tstat that use control codes, e.g., `Warning:` in bold.
+
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 
 
-When quitting, the system prints overall statistics on its working divided by network interface and by instance.
+To stop Tstat-DPDK, press `CTRL+C` or send `SIGINT` or `SIGTERM` to the parent process (instance 0): it stops all the instances. If an instance dies, the parent stops the others.
+
+When quitting, the system prints overall statistics on its working divided by network interface (with the packets received by each queue, i.e., by each instance) and by instance, including the Tstat ones.
 The output has this form.
 ```
-PORT: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
-	Queue 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
-	Queue 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
-PORT: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
-	Queue 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
-	Queue 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+TIME: 2026-10-31 09:50:30 - PORT: 0 Rx: 113929312 Drp: 0 Tot: 113929312 Perc: 0.000%
+	Queue 0 Rx: 46691680 Err: 0 Tot: 46691680
+	Queue 1 Rx: 67237632 Err: 0 Tot: 67237632
 
-INSTANCE: 0 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 0 Rx: 46691680 Drp: 0 Tot: 46691680 Perc: 0.000%
 TSTAT STATISTICS:
-Total packets: 0
-TCP flows: 0
-UDP flows: 0
-Time elapsed: 2880.317s
+Total packets: 46691680
+TCP flows: 120512
+UDP flows: 230147
+Time elapsed: 3600.292s
 
-INSTANCE: 1 Rx: 0 Drp: 0 Tot: 0 Perc: -nan%
+INSTANCE: 1 Rx: 67237632 Drp: 0 Tot: 67237632 Perc: 0.000%
 TSTAT STATISTICS:
-Total packets: 0
-TCP flows: 0
-UDP flows: 0
-Time elapsed: 2879.215s
+Total packets: 67237632
+TCP flows: 151003
+UDP flows: 290418
+Time elapsed: 3600.582s
 ```
 ## 4.3 <a name="logs"></a>Log Files Directory
 Tstat produces several log files for different events seen on the network.

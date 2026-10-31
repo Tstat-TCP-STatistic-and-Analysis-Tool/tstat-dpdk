@@ -1,22 +1,28 @@
-#THIS SCRIPT CONFIGURES THE SYSTEM TO RUN TSTAT-DPDK
-#NOTE 1: Please check if the operation are the ones needed in you machine
-#NOTE 2: Please define RTE_SDK and RTE_TARGET according to your DPDK installation
+#!/bin/bash
+# Configure the system to run Tstat-DPDK (see Section 3 of the README). Run it after each reboot.
+# NOTE: check that the operations are the ones needed on your machine, and set the parameters below.
 
-#Set CPU governor on performance
-sudo cpufreq-set -r -g performance
+# Hugepages: about 1100 hugepages of 2 MB (2.2 GB) for each Tstat instance.
+# On NUMA machines, this amount is reserved on each node
+HUGEPAGES_MEM=12G
 
-#Disable Address Space Layout Randomization (ASLR)
-sudo bash -c "echo 0 > /proc/sys/kernel/randomize_va_space"
+# PCI addresses of the NICs to bind to DPDK (see 'dpdk-devbind.py --status').
+# The interfaces must be down
+IFACES=("0000:04:00.0" "0000:04:00.1")
 
-#Creating and mounting hugepages. 
-sudo bash -c "echo 6144 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
-sudo mkdir -p /mnt/huge
-sudo mount -t hugetlbfs nodev /mnt/huge
+set -e
 
-#Loading modules
-sudo modprobe uio
-sudo insmod $RTE_SDK/$RTE_TARGET/kmod/igb_uio.ko
+# Set the CPU governor to performance
+sudo cpupower frequency-set -g performance
 
-#Binding interfaces to DPDK drivers
-#NOTE 3: if you don't want to bind all the DPDK-supported interfaces to DPDK, modify the line below.
-sudo $RTE_SDK/tools/dpdk_nic_bind.py --bind=igb_uio $($RTE_SDK/tools/dpdk_nic_bind.py --status | sed -rn 's,.* if=([^ ]*).*igb_uio *$,\1,p')
+# Reserve and mount the hugepages
+sudo dpdk-hugepages.py --pagesize 2M --setup $HUGEPAGES_MEM
+
+# Bind the NICs to the vfio-pci driver (it needs the IOMMU enabled in the kernel command line)
+sudo modprobe vfio-pci
+for IFACE in "${IFACES[@]}" ; do
+	sudo dpdk-devbind.py --bind=vfio-pci $IFACE
+done
+
+dpdk-hugepages.py --show
+dpdk-devbind.py --status-dev net

@@ -264,17 +264,18 @@ The `-c` and `-n` options before `--` are DPDK-related. **Do not change them.** 
 Every second, Tstat-DPDK prints statistics about the last second. If the output is a terminal, the screen is redrawn from the top at each update; otherwise (e.g., when redirected to a file), the statistics are appended.
 ```
 ═══ Tstat-DPDK ═══ 2026-10-30 20:18:29 ═══ uptime 0d 02:14:07 ═══════════
+Lost since start: 3 105 packets (0.001%)  LOSS
 
 PORT        Mbps      kpps      missed      errors    drop%
    0       959.0     120.2           0           0    0.000
    1       614.8      62.8           0           0    0.000
  all      1573.8     183.0           0           0    0.000
 
-INST        Mbps      kpps   share%   ring%     drops    drop%
-   0       536.9      62.1    34.1    0.09      1 482    2.387
-   1       517.6      58.6    32.9    0.05          0    0.000
-   2       327.3      37.1    20.8    0.00          0    0.000
-   3       190.9      21.6    12.1    0.00          0    0.000
+INST        Mbps      kpps   share%   ring%       drops    drop%
+   0       536.9      62.1    34.1   78.40       1 482    2.387  LOSS
+   1       517.6      58.6    32.9   61.25           0    0.000  RING>50%
+   2       327.3      37.1    20.8    0.00           0    0.000
+   3       190.9      21.6    12.1    0.00           0    0.000
 ```
 For each port (and for all of them):
 * `Mbps` and `kpps`: rate of the packets received by the NIC.
@@ -287,6 +288,9 @@ For each instance:
 * `share%`: percentage of the packets of all the instances analyzed by this instance, which shows how RSS balances the traffic.
 * `ring%`: maximum occupancy, in the last second, of the ring between the producer and the consumer. A high value means that the consumer cannot keep up with the traffic.
 * `drops` and `drop%`: packets dropped by the producer, because the ring is full.
+
+The first line reports the packets lost since the start, by the NICs (missed and erroneous) and by the instances (dropped), and their percentage over the packets that reached the NICs.
+The rows with losses in the last second end with `LOSS`, and the instances whose ring was more than 50% full (`RING_WARN_PERC` in `src/tstat-dpdk-params.h`) end with `RING>50%`, as they are about to lose packets. On a terminal, these rows are also colored in red and yellow, respectively, as is the first line if any packet has been lost.
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 

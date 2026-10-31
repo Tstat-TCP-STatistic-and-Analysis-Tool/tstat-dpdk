@@ -597,83 +597,138 @@ static void display_init(void)
 		rte_eth_stats_get(i, &display.ports[i]);
 }
 
-static void display_print_ports(double interval)
+/* Rows with losses or with a high ring occupancy: on a terminal they are colored, and a marker is
+   appended at the end, so that they can also be found in a file */
+enum row_level { ROW_OK, ROW_WARN, ROW_LOSS };
+
+static void row_begin(enum row_level level)
+{
+	if (display.tty && level == ROW_LOSS)
+		screen_printf("\033[31m");	/* Red */
+	else if (display.tty && level == ROW_WARN)
+		screen_printf("\033[33m");	/* Yellow */
+}
+
+static void row_end(enum row_level level)
+{
+	if (level == ROW_LOSS)
+		screen_printf("  LOSS");
+	else if (level == ROW_WARN)
+		screen_printf("  RING>%d%%", RING_WARN_PERC);
+	if (display.tty && level != ROW_OK)
+		screen_printf("\033[0m");
+	screen_newline();
+}
+
+/* Missed includes the packets dropped because the mempool is full */
+static uint64_t port_missed(const struct rte_eth_stats * stat)
+{
+	return stat->imissed + stat->rx_nombuf;
+}
+
+static void display_print_ports(const struct rte_eth_stats * ports, double interval)
 {
 	int i;
 	char buf1 [32], buf2 [32];
-	struct rte_eth_stats stat;
 	uint64_t packets, bytes, missed, errors;
 	uint64_t tot_packets = 0, tot_bytes = 0, tot_missed = 0, tot_errors = 0;
+	enum row_level level;
 
 	screen_printf("PORT        Mbps      kpps      missed      errors    drop%%");
 	screen_newline();
 	for (i = 0; i < nb_ports; i++){
-		rte_eth_stats_get(i, &stat);
-		packets = stat.ipackets - display.ports[i].ipackets;
-		bytes = stat.ibytes - display.ports[i].ibytes;
-		/* Missed includes the packets dropped because the mempool is full */
-		missed = stat.imissed - display.ports[i].imissed + stat.rx_nombuf - display.ports[i].rx_nombuf;
-		errors = stat.ierrors - display.ports[i].ierrors;
-		display.ports[i] = stat;
+		packets = ports[i].ipackets - display.ports[i].ipackets;
+		bytes = ports[i].ibytes - display.ports[i].ibytes;
+		missed = port_missed(&ports[i]) - port_missed(&display.ports[i]);
+		errors = ports[i].ierrors - display.ports[i].ierrors;
+		display.ports[i] = ports[i];
 
+		level = missed + errors > 0 ? ROW_LOSS : ROW_OK;
+		row_begin(level);
 		screen_printf("%4d  %10.1f  %8.1f  %10s  %10s  %7.3f", i, bytes * 8 / interval / 1e6, packets / interval / 1e3,
 		              fmt_count(buf1, sizeof(buf1), missed), fmt_count(buf2, sizeof(buf2), errors),
 		              percent(missed + errors, packets + missed + errors));
-		screen_newline();
+		row_end(level);
 		tot_packets += packets;
 		tot_bytes += bytes;
 		tot_missed += missed;
 		tot_errors += errors;
 	}
+
+	level = tot_missed + tot_errors > 0 ? ROW_LOSS : ROW_OK;
+	row_begin(level);
 	screen_printf(" all  %10.1f  %8.1f  %10s  %10s  %7.3f", tot_bytes * 8 / interval / 1e6, tot_packets / interval / 1e3,
 	              fmt_count(buf1, sizeof(buf1), tot_missed), fmt_count(buf2, sizeof(buf2), tot_errors),
 	              percent(tot_missed + tot_errors, tot_packets + tot_missed + tot_errors));
-	screen_newline();
+	row_end(level);
 }
 
-static void display_print_instances(double interval)
+static void display_print_instances(const struct instance_counters * instances, const uint64_t * ring_max, double interval)
 {
 	int i;
 	char buf [32];
-	uint64_t ring_max [MAX_INSTANCES];
-	struct instance_counters now [MAX_INSTANCES], delta [MAX_INSTANCES];
+	struct instance_counters delta [MAX_INSTANCES];
 	uint64_t tot_packets = 0;
+	double ring_perc;
+	enum row_level level;
 
-	/* Take a snapshot of the counters of all the instances */
 	for (i = 0; i < nb_instances; i++){
-		now[i].rx_pkts = __atomic_load_n(&counters[i].rx_pkts, __ATOMIC_RELAXED);
-		now[i].rx_bytes = __atomic_load_n(&counters[i].rx_bytes, __ATOMIC_RELAXED);
-		now[i].drops = __atomic_load_n(&counters[i].drops, __ATOMIC_RELAXED);
-		ring_max[i] = __atomic_exchange_n(&counters[i].ring_max, 0, __ATOMIC_RELAXED);
-		delta[i].rx_pkts = now[i].rx_pkts - display.instances[i].rx_pkts;
-		delta[i].rx_bytes = now[i].rx_bytes - display.instances[i].rx_bytes;
-		delta[i].drops = now[i].drops - display.instances[i].drops;
-		display.instances[i] = now[i];
+		delta[i].rx_pkts = instances[i].rx_pkts - display.instances[i].rx_pkts;
+		delta[i].rx_bytes = instances[i].rx_bytes - display.instances[i].rx_bytes;
+		delta[i].drops = instances[i].drops - display.instances[i].drops;
+		display.instances[i] = instances[i];
 		tot_packets += delta[i].rx_pkts;
 	}
 
-	screen_printf("INST        Mbps      kpps   share%%   ring%%     drops    drop%%");
+	screen_printf("INST        Mbps      kpps   share%%   ring%%       drops    drop%%");
 	screen_newline();
 	for (i = 0; i < nb_instances; i++){
-		screen_printf("%4d  %10.1f  %8.1f   %6.1f  %6.2f  %8s  %7.3f", i,
+		ring_perc = percent(ring_max[i], rte_ring_get_capacity(rings[i]));
+		level = delta[i].drops > 0 ? ROW_LOSS : ring_perc >= RING_WARN_PERC ? ROW_WARN : ROW_OK;
+		row_begin(level);
+		screen_printf("%4d  %10.1f  %8.1f   %6.1f  %6.2f  %10s  %7.3f", i,
 		              delta[i].rx_bytes * 8 / interval / 1e6, delta[i].rx_pkts / interval / 1e3,
-		              percent(delta[i].rx_pkts, tot_packets), percent(ring_max[i], rte_ring_get_capacity(rings[i])),
+		              percent(delta[i].rx_pkts, tot_packets), ring_perc,
 		              fmt_count(buf, sizeof(buf), delta[i].drops), percent(delta[i].drops, delta[i].rx_pkts));
-		screen_newline();
+		row_end(level);
 	}
 }
 
 /* Print the stats of the last interval: on a terminal, redraw the screen from the top */
 static void display_update(void)
 {
-	char date [32];
+	int i;
+	char date [32], buf [32];
 	time_t now, uptime;
-	uint64_t tsc;
+	uint64_t tsc, lost, offered;
 	double interval;
+	struct rte_eth_stats ports [MAX_PORTS];
+	struct instance_counters instances [MAX_INSTANCES];
+	uint64_t ring_max [MAX_INSTANCES];
+	enum row_level level;
 
 	tsc = rte_get_tsc_cycles();
 	interval = (double)(tsc - display.last_time) / rte_get_tsc_hz();
 	display.last_time = tsc;
+
+	/* Take a snapshot of the counters of the ports and of the instances */
+	for (i = 0; i < nb_ports; i++)
+		rte_eth_stats_get(i, &ports[i]);
+	for (i = 0; i < nb_instances; i++){
+		instances[i].rx_pkts = __atomic_load_n(&counters[i].rx_pkts, __ATOMIC_RELAXED);
+		instances[i].rx_bytes = __atomic_load_n(&counters[i].rx_bytes, __ATOMIC_RELAXED);
+		instances[i].drops = __atomic_load_n(&counters[i].drops, __ATOMIC_RELAXED);
+		ring_max[i] = __atomic_exchange_n(&counters[i].ring_max, 0, __ATOMIC_RELAXED);
+	}
+
+	/* Packets lost since the start, by the NICs and by the instances: the stats of the ports are reset at the start */
+	lost = offered = 0;
+	for (i = 0; i < nb_ports; i++){
+		lost += port_missed(&ports[i]) + ports[i].ierrors;
+		offered += ports[i].ipackets + port_missed(&ports[i]) + ports[i].ierrors;
+	}
+	for (i = 0; i < nb_instances; i++)
+		lost += instances[i].drops;
 
 	now = time(NULL);
 	uptime = now - display.start;
@@ -685,10 +740,14 @@ static void display_update(void)
 	screen_printf("═══ Tstat-DPDK ═══ %s ═══ uptime %ldd %02ld:%02ld:%02ld ═══════════", date,
 	              (long)uptime / 86400, (long)uptime / 3600 % 24, (long)uptime / 60 % 60, (long)uptime % 60);
 	screen_newline();
+	level = lost > 0 ? ROW_LOSS : ROW_OK;
+	row_begin(level);
+	screen_printf("Lost since start: %s packets (%.3f%%)", fmt_count(buf, sizeof(buf), lost), percent(lost, offered));
+	row_end(level);
 	screen_newline();
-	display_print_ports(interval);
+	display_print_ports(ports, interval);
 	screen_newline();
-	display_print_instances(interval);
+	display_print_instances(instances, ring_max, interval);
 	screen_printf(display.tty ? "\033[J" : "\n");
 
 	/* Write the whole screen at once */

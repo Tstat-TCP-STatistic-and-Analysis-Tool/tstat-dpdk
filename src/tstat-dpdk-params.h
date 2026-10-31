@@ -28,6 +28,7 @@
 /* Ring between the producer and the consumer of each instance */
 #define INTERMEDIATERING_NAME "intermediate_ring"
 #define INTERMEDIATERING_SZ (MEMPOOL_ELEM_NB+1)
+#define RING_WARN_PERC 50		/* Instances whose ring is fuller than this percentage are highlighted */
 
 #define RX_QUEUE_SZ 4096		/* Size of the rx queues: 4096 is the maximum and gives the best performance */
 #define TX_QUEUE_SZ 256			/* Unused, packets are never transmitted */

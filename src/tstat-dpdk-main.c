@@ -541,6 +541,10 @@ static struct {
 	uint64_t last_time;		/* TSC cycles */
 	uint64_t lost;			/* Packets lost since the start */
 	time_t last_loss;		/* Time of the last loss, 0 if none */
+	/* The probes always lose packets in the first second: the losses until the first update are not counted */
+	int first;			/* The first update has not been printed yet */
+	uint64_t lost_first;
+	uint64_t offered_first;
 	/* Counters at the end of the previous interval */
 	struct rte_eth_stats ports [MAX_PORTS];
 	struct instance_counters instances [MAX_INSTANCES];
@@ -595,6 +599,7 @@ static void display_init(void)
 	display.tty = isatty(STDOUT_FILENO);
 	display.start = time(NULL);
 	display.last_time = rte_get_tsc_cycles();
+	display.first = 1;
 	for (i = 0; i < nb_ports; i++)
 		rte_eth_stats_get(i, &display.ports[i]);
 }
@@ -644,6 +649,8 @@ static void display_print_ports(const struct rte_eth_stats * ports, double inter
 		missed = port_missed(&ports[i]) - port_missed(&display.ports[i]);
 		errors = ports[i].ierrors - display.ports[i].ierrors;
 		display.ports[i] = ports[i];
+		if (display.first)
+			missed = errors = 0;
 
 		level = missed + errors > 0 ? ROW_LOSS : ROW_OK;
 		row_begin(level);
@@ -677,7 +684,7 @@ static void display_print_instances(const struct instance_counters * instances, 
 	for (i = 0; i < nb_instances; i++){
 		delta[i].rx_pkts = instances[i].rx_pkts - display.instances[i].rx_pkts;
 		delta[i].rx_bytes = instances[i].rx_bytes - display.instances[i].rx_bytes;
-		delta[i].drops = instances[i].drops - display.instances[i].drops;
+		delta[i].drops = display.first ? 0 : instances[i].drops - display.instances[i].drops;
 		display.instances[i] = instances[i];
 		tot_packets += delta[i].rx_pkts;
 	}
@@ -722,7 +729,8 @@ static void display_update(void)
 		ring_max[i] = __atomic_exchange_n(&counters[i].ring_max, 0, __ATOMIC_RELAXED);
 	}
 
-	/* Packets lost since the start, by the NICs and by the instances: the stats of the ports are reset at the start */
+	/* Packets lost since the start, by the NICs and by the instances: the stats of the ports are reset at the start,
+	   and the packets until the first update are not counted */
 	lost = offered = 0;
 	for (i = 0; i < nb_ports; i++){
 		lost += port_missed(&ports[i]) + ports[i].ierrors;
@@ -730,6 +738,12 @@ static void display_update(void)
 	}
 	for (i = 0; i < nb_instances; i++)
 		lost += instances[i].drops;
+	if (display.first){
+		display.lost_first = lost;
+		display.offered_first = offered;
+	}
+	lost -= display.lost_first;
+	offered -= display.offered_first;
 
 	now = time(NULL);
 	uptime = now - display.start;
@@ -757,6 +771,7 @@ static void display_update(void)
 	screen_newline();
 	display_print_instances(instances, ring_max, interval);
 	screen_printf(display.tty ? "\033[J" : "\n");
+	display.first = 0;
 
 	/* Write the whole screen at once */
 	fflush(stdout);

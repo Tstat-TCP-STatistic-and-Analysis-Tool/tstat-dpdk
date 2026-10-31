@@ -291,6 +291,7 @@ For each instance:
 
 The line under the title reports the packets lost since the start, by the NICs (missed and erroneous) and by the instances (dropped), their percentage over the packets that reached the NICs, and the time of the last loss (`never` if no packet has been lost).
 The rows with losses in the last second end with `LOSS`, and the instances whose ring was more than 50% full (`RING_WARN_PERC` in `src/tstat-dpdk-params.h`) end with `RING>50%`, as they are about to lose packets. On a terminal, these rows are also colored in red and yellow, respectively.
+As the probes always lose some packets when starting, the losses until the first update (after one second) are not counted, neither in the rows nor in the total.
 
 ## 4.2 <a name="stop"></a>Stop Tstat Instances
 
